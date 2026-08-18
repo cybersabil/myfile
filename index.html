@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; connect-src https://cybersabil-myfile-gateway.multi4u121.workers.dev https://challenges.cloudflare.com; frame-src https://cybersabil-myfile-gateway.multi4u121.workers.dev https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none';">
+<title>CyberSabil Public Files</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">CyberSabil Public Files</div>
+  <div class="path" id="breadcrumbs"></div>
+  <input id="search" class="search" type="search" placeholder="Search…" autocomplete="off">
+  <button class="btn" id="backBtn" type="button">← Back</button>
+  <button class="btn" id="refreshBtn" type="button">↻ Refresh</button>
+  <button class="btn" id="viewBtn" type="button">☷ List</button>
+  <button class="btn" id="logoutBtn" type="button">Logout</button>
+</header>
+
+<section id="authLayer" class="auth-layer">
+  <div class="auth-card">
+    <div class="auth-title">CyberSabil My Files</div>
+    <div id="authText" class="auth-text">Checking secure portal…</div>
+    <div id="setupBox" class="hidden">
+      <label for="setupCode">One-time setup code</label>
+      <input id="setupCode" class="auth-input" type="password" autocomplete="off">
+      <button id="setupBtn" class="auth-primary" type="button">Create Passkey</button>
+    </div>
+    <button id="loginBtn" class="auth-primary hidden" type="button">Unlock with Passkey</button>
+    <div id="turnstileBox"></div>
+    <div id="authMsg" class="auth-msg"></div>
+  </div>
+</section>
+
+<main id="filesArea" class="content hidden">
+  <div id="main" class="loading">Loading files…</div>
+</main>
+
+<div id="previewModal" class="preview-modal hidden" role="dialog" aria-modal="true">
+  <div class="preview-box">
+    <div class="preview-head">
+      <div id="previewTitle" class="preview-title">Preview</div>
+      <button id="closePreview" class="btn" type="button">Close</button>
+    </div>
+    <iframe id="previewFrame" title="File preview"></iframe>
+  </div>
+</div>
+<iframe id="downloadFrame" class="download-frame" title="download"></iframe>
+
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+<script src="./simplewebauthn-browser.js" defer></script>
+<script src="./app.js" defer></script>
+</body>
+</html>
