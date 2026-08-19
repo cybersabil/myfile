@@ -107,7 +107,6 @@
   function ready(){
     arrange();
     requestAnimationFrame(()=>{
-      document.documentElement.classList.remove('cy-preboot');
       document.documentElement.classList.add('cy-ui-ready');
     });
   }
@@ -130,7 +129,7 @@
     setTimeout(arrange,800);
 
     /* hard fail-safe: never leave page masked */
-    setTimeout(()=>document.documentElement.classList.remove('cy-preboot'),2200);
+    setTimeout(()=>{},2200);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
