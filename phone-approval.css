@@ -1,0 +1,47 @@
+/* CYBERSABIL_PHONE_APPROVAL_UI_V1 */
+
+/* No center flash on refresh. Keep the page calm until app.js has chosen auth/files. */
+html.cy-preboot body>*{visibility:hidden!important}
+html.cy-preboot body{background:#f4f7fc!important}
+html.cy-preboot::before{
+  content:"";position:fixed;inset:0;z-index:2147483645;
+  background:radial-gradient(circle at 13% 11%,rgba(88,110,243,.075),transparent 30rem),radial-gradient(circle at 90% 88%,rgba(93,169,255,.05),transparent 31rem),#f4f7fc
+}
+html.cy-preboot::after{
+  content:"";position:fixed;left:0;top:0;z-index:2147483646;width:38%;height:2px;
+  background:linear-gradient(90deg,transparent,#667bf2,transparent);
+  animation:cy-preboot-line 1.05s ease-in-out infinite
+}
+@keyframes cy-preboot-line{0%{transform:translateX(-110vw);opacity:.2}45%{opacity:.85}100%{transform:translateX(280vw);opacity:.15}}
+
+.cy-phone-approval-overlay{
+  position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:18px;
+  background:rgba(25,32,46,.48);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)
+}
+.cy-phone-approval-card{
+  width:min(410px,100%);box-sizing:border-box;padding:23px;border:1px solid rgba(255,255,255,.72);border-radius:17px;
+  background:#fff;color:#172033;box-shadow:0 28px 78px rgba(18,25,39,.22);animation:cy-phone-card-in .2s ease-out
+}
+.cy-phone-icon{
+  width:48px;height:48px;display:grid;place-items:center;margin-bottom:15px;border-radius:14px;
+  background:#f0f4ff;color:#526cf0;font-size:23px;font-weight:800
+}
+.cy-phone-approval-card h2{margin:0;color:#172033;font-size:21px;line-height:1.25;font-weight:680;letter-spacing:-.025em}
+.cy-phone-approval-card p{margin:8px 0 0;color:#778397;font-size:11.5px;line-height:1.58}
+.cy-phone-state{
+  min-height:48px;display:flex;align-items:center;gap:10px;margin:17px 0 4px;padding:10px 12px;
+  border:1px solid #e6eaf1;border-radius:11px;background:#fafbfd;color:#627087;font-size:11px;line-height:1.4
+}
+.cy-phone-spinner{width:16px;height:16px;flex:0 0 auto;border:2px solid rgba(88,110,243,.16);border-top-color:#6075f3;border-radius:50%;animation:cy-phone-spin .72s linear infinite}
+.cy-phone-button{width:100%;min-height:44px;margin-top:10px;border:0;border-radius:10px;cursor:pointer;font-size:12px;font-weight:660}
+.cy-phone-button.primary{color:#fff;background:linear-gradient(120deg,#556df1,#6878f4);box-shadow:0 8px 18px rgba(85,109,241,.15)}
+.cy-phone-button.secondary{color:#536078;background:#f0f3f7}
+.cy-phone-button.link{min-height:32px;margin-top:7px;color:#5c6ed6;background:transparent}
+.cy-phone-button:disabled{opacity:.56;cursor:wait}
+.cy-phone-error{border-color:#efd1d1;background:#fff8f8;color:#b24b4b}
+.cy-phone-shake{animation:cy-phone-shake .34s ease}
+@keyframes cy-phone-spin{to{transform:rotate(360deg)}}
+@keyframes cy-phone-card-in{from{opacity:0;transform:translateY(7px) scale(.989)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes cy-phone-shake{0%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}100%{transform:translateX(0)}}
+@media(max-width:520px){.cy-phone-approval-overlay{padding:10px}.cy-phone-approval-card{padding:20px;border-radius:15px}}
+@media(prefers-reduced-motion:reduce){html.cy-preboot::after,.cy-phone-spinner,.cy-phone-approval-card,.cy-phone-shake{animation:none!important}}
