@@ -1,4 +1,4 @@
-/* CYBERSABIL_PUSH_SERVICE_WORKER_V1 */
+/* CYBERSABIL_PUSH_SERVICE_WORKER_V1_1_AUTO_CLOSE */
 importScripts('./push-common.js?v=push1');
 
 self.addEventListener('install', event => {
@@ -62,6 +62,22 @@ self.addEventListener('notificationclick', event => {
   const data = event.notification.data || {};
   if (data.type !== 'number-match') return;
 
+  const expiresAt = Number(data.expiresAt || 0);
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  if (expiresAt && nowSec > expiresAt) {
+    event.waitUntil(
+      self.registration.showNotification(
+        'CyberSabil — Request expired',
+        {
+          body: 'Ye sign-in request expire ho chuki hai.',
+          tag: 'cybersabil-approval-result',
+        }
+      )
+    );
+    return;
+  }
+
   const picked = String(event.action || '');
   if (picked.startsWith('pick:')) {
     const choice = Number(picked.slice(5));
@@ -94,12 +110,22 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then(async list => {
+        // Reuse ONLY an existing approval page. Do not hijack an arbitrary
+        // CyberSabil/MyFile tab. A newly-opened approval window is much more
+        // likely to be eligible for window.close() after success/expiry.
         for (const client of list) {
-          if ('navigate' in client) {
-            await client.navigate(url.href);
-            return client.focus();
-          }
+          try {
+            const current = new URL(client.url);
+            if (
+              current.pathname.endsWith('/push-approve.html') &&
+              'navigate' in client
+            ) {
+              await client.navigate(url.href);
+              return client.focus();
+            }
+          } catch {}
         }
+
         return self.clients.openWindow(url.href);
       })
   );
