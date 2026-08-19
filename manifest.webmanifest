@@ -1,0 +1,11 @@
+{
+  "id": "/myfile/cybersabil-push",
+  "name": "CyberSabil Secure Approval",
+  "short_name": "CyberSabil",
+  "start_url": "./push-setup.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#596ff1",
+  "description": "CyberSabil secure sign-in approval notifications"
+}
