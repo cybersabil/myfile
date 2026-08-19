@@ -1,0 +1,231 @@
+/* CYBERSABIL_COMPACT_WORKSPACE_HEADER_V1
+   Targeted override only.
+   Keeps file cards/list, auth UI, push MFA, download behavior and backend untouched.
+*/
+
+.topbar{
+  min-height:48px;
+  padding:6px 10px;
+  grid-template-columns:
+    auto
+    minmax(90px,1fr)
+    minmax(160px,260px)
+    auto auto auto auto auto auto;
+  grid-template-areas:
+    "brand path search back refresh view push change logout";
+  gap:6px;
+  align-items:center;
+}
+
+.brand{
+  grid-area:brand;
+  font-size:12px;
+}
+
+.brand::before{
+  width:26px;
+  height:26px;
+  border-radius:8px;
+  font-size:8px;
+}
+
+.path{grid-area:path}
+
+.search{
+  grid-area:search;
+  height:34px;
+  border-radius:9px;
+  font-size:11.5px;
+}
+
+.btn{
+  height:32px;
+  min-width:32px;
+  padding:0 8px;
+  border-radius:9px;
+  font-size:10.5px;
+}
+
+#backBtn{grid-area:back}
+#refreshBtn{grid-area:refresh}
+#viewBtn{grid-area:view}
+#pushAlertsBtn{grid-area:push}
+#changePasswordBtn{grid-area:change}
+#logoutBtn{
+  grid-area:logout;
+  align-self:center;
+}
+
+/* Keep all authenticated controls on the SAME desktop header row. */
+@media (min-width:721px){
+  .topbar{
+    grid-auto-flow:row;
+    grid-auto-rows:auto;
+  }
+
+  #logoutBtn,
+  #changePasswordBtn,
+  #pushAlertsBtn{
+    margin:0;
+  }
+}
+
+/* Compact tablet without introducing a second action row. */
+@media (min-width:721px) and (max-width:1100px){
+  .topbar{
+    padding-inline:8px;
+    grid-template-columns:
+      auto
+      minmax(60px,1fr)
+      minmax(125px,185px)
+      auto auto auto auto auto auto;
+    gap:5px;
+  }
+
+  .brand{
+    font-size:11px;
+    gap:6px;
+  }
+
+  .brand::before{
+    width:24px;
+    height:24px;
+  }
+
+  .btn{
+    height:30px;
+    min-width:30px;
+    padding-inline:6px;
+    font-size:9.5px;
+  }
+
+  .search{
+    height:32px;
+    font-size:11px;
+  }
+
+  .crumb{
+    max-width:120px;
+    padding-inline:5px;
+    font-size:9.5px;
+  }
+}
+
+/* Mobile: two compact rows only.
+   Row 1 = brand + navigation/security actions.
+   Row 2 = search.
+   Breadcrumb is hidden because Back remains directly available. */
+@media (max-width:720px){
+  .topbar{
+    position:sticky;
+    top:0;
+    min-height:0;
+    padding:6px 8px 7px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) repeat(6,30px);
+    grid-template-areas:
+      "brand back refresh view push change logout"
+      "search search search search search search search";
+    gap:5px 4px;
+    align-items:center;
+  }
+
+  .brand{
+    grid-area:brand;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    font-size:11px;
+    gap:6px;
+  }
+
+  .brand::before{
+    width:26px;
+    height:26px;
+    flex:0 0 26px;
+  }
+
+  .path{
+    display:none!important;
+  }
+
+  .search{
+    grid-area:search;
+    height:34px;
+    min-width:0;
+    font-size:12px;
+    border-radius:9px;
+  }
+
+  #backBtn{grid-area:back}
+  #refreshBtn{grid-area:refresh}
+  #viewBtn{grid-area:view}
+  #pushAlertsBtn{grid-area:push}
+  #changePasswordBtn{grid-area:change}
+  #logoutBtn{grid-area:logout}
+
+  .topbar .btn{
+    width:30px;
+    min-width:30px;
+    height:30px;
+    padding:0;
+    display:grid;
+    place-items:center;
+    overflow:hidden;
+    border-radius:8px;
+    font-size:0;
+    line-height:1;
+  }
+
+  .topbar .btn::before{
+    font-size:14px;
+    line-height:1;
+  }
+
+  #backBtn::before{content:"←"}
+  #refreshBtn::before{content:"↻"}
+  #viewBtn::before{content:"☷"}
+  #pushAlertsBtn::before{content:"🔔";font-size:13px}
+  #changePasswordBtn::before{content:"🔑";font-size:12px}
+  #logoutBtn::before{content:"↪";font-size:14px}
+
+  /* Override historical 108/140px mobile header minimums. */
+  .content{
+    padding-top:10px;
+  }
+}
+
+@media (max-width:430px){
+  .topbar{
+    min-height:0;
+    padding:5px 6px 6px;
+    grid-template-columns:minmax(0,1fr) repeat(6,28px);
+    gap:4px 3px;
+  }
+
+  .topbar .btn{
+    width:28px;
+    min-width:28px;
+    height:28px;
+  }
+
+  .brand{
+    font-size:0;
+    gap:0;
+  }
+
+  .brand::before{
+    width:26px;
+    height:26px;
+    margin:0;
+  }
+
+  .search{
+    height:33px;
+  }
+
+  /* Keep the existing one-column file-card layout below 430px. */
+  .grid{
+    grid-template-columns:1fr;
+  }
+}
