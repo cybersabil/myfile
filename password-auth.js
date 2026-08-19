@@ -746,59 +746,238 @@
     return await new Promise((resolve,reject)=>{
       const overlay=document.createElement('div');
       overlay.className='cy-phone-approval-overlay';
+
       const card=document.createElement('div');
       card.className='cy-phone-approval-card';
+
       const icon=document.createElement('div');
-      icon.className='cy-phone-icon'; icon.textContent='✓';
-      const title=document.createElement('h2'); title.textContent='Approve on your phone';
+      icon.className='cy-phone-icon';
+      icon.textContent='✓';
+
+      const title=document.createElement('h2');
+      title.textContent='Approve with phone / passkey';
+
       const description=document.createElement('p');
-      description.textContent='Your password is correct. Approve this sign-in with your registered passkey. Your browser may show your phone, a device picker, or a QR code.';
-      const state=document.createElement('div'); state.className='cy-phone-state';
-      const spinner=document.createElement('span'); spinner.className='cy-phone-spinner';
-      const stateText=document.createElement('span'); stateText.textContent='Preparing secure phone approval…';
+      description.textContent=
+        'Your password is correct. Click below to open the browser’s secure passkey prompt. Choose your registered phone / another device if offered. If no phone credential is available yet, use the 6-digit fallback once and then use “Add Phone” from the file toolbar.';
+
+      const state=document.createElement('div');
+      state.className='cy-phone-state';
+
+      const spinner=document.createElement('span');
+      spinner.className='cy-phone-spinner';
+
+      const stateText=document.createElement('span');
+      stateText.textContent=
+        'Ready. Click the button to open the secure browser prompt.';
+
       state.append(spinner,stateText);
-      const retry=document.createElement('button'); retry.type='button'; retry.className='cy-phone-button primary'; retry.textContent='Approve with phone / passkey';
-      const totp=document.createElement('button'); totp.type='button'; totp.className='cy-phone-button link'; totp.textContent='Use 6-digit authenticator code instead';
-      const cancel=document.createElement('button'); cancel.type='button'; cancel.className='cy-phone-button secondary'; cancel.textContent='Cancel';
-      card.append(icon,title,description,state,retry,totp,cancel); overlay.append(card); document.body.append(overlay);
+
+      const retry=document.createElement('button');
+      retry.type='button';
+      retry.className='cy-phone-button primary';
+      retry.textContent='Continue to phone / passkey';
+
+      const totp=document.createElement('button');
+      totp.type='button';
+      totp.className='cy-phone-button link';
+      totp.textContent='Use 6-digit authenticator code instead';
+
+      const cancel=document.createElement('button');
+      cancel.type='button';
+      cancel.className='cy-phone-button secondary';
+      cancel.textContent='Cancel';
+
+      card.append(
+        icon,
+        title,
+        description,
+        state,
+        retry,
+        totp,
+        cancel
+      );
+
+      overlay.append(card);
+      document.body.append(overlay);
 
       let running=false;
-      const setBusy=text=>{state.classList.remove('cy-phone-error');stateText.textContent=text;retry.disabled=true;totp.disabled=true;cancel.disabled=true;};
-      const setIdle=()=>{retry.disabled=false;totp.disabled=false;cancel.disabled=false;};
-      const fail=text=>{state.classList.add('cy-phone-error');stateText.textContent=text;card.classList.remove('cy-phone-shake');void card.offsetWidth;card.classList.add('cy-phone-shake');setTimeout(()=>card.classList.remove('cy-phone-shake'),420);setIdle();};
+
+      const setBusy=text=>{
+        running=true;
+        state.classList.remove('cy-phone-error');
+        stateText.textContent=text;
+        retry.disabled=true;
+        totp.disabled=true;
+        cancel.disabled=true;
+      };
+
+      const setIdle=()=>{
+        running=false;
+        retry.disabled=false;
+        totp.disabled=false;
+        cancel.disabled=false;
+      };
+
+      const fail=text=>{
+        setIdle();
+        state.classList.add('cy-phone-error');
+        stateText.textContent=text;
+        card.classList.remove('cy-phone-shake');
+        void card.offsetWidth;
+        card.classList.add('cy-phone-shake');
+        setTimeout(
+          ()=>card.classList.remove('cy-phone-shake'),
+          420
+        );
+      };
 
       async function runApproval(){
         if(running)return;
-        running=true;
+
         try{
-          setBusy('Running security check…');
-          const tsToken=await phonePasskeyTurnstileToken(turnstileHost);
-          setBusy('Preparing your registered passkey…');
-          const o=await phonePasskeyFetch('/auth/login/options',{method:'POST',headers:{'Content-Type':'application/json','X-Turnstile-Token':tsToken},body:'{}'});
-          if(!window.SimpleWebAuthnBrowser||typeof window.SimpleWebAuthnBrowser.startAuthentication!=='function') throw new Error('PASSKEY_LIBRARY_UNAVAILABLE');
-          setBusy('Waiting for approval on your phone / passkey…');
-          const response=await window.SimpleWebAuthnBrowser.startAuthentication({optionsJSON:o.options});
-          setBusy('Approval received. Finishing sign-in…');
-          const verified=await phonePasskeyFetch('/auth/login/verify',{
-            method:'POST',
-            headers:{'Content-Type':'application/json','X-Password-Stepup-Token':login.mfaToken},
-            body:JSON.stringify({challengeId:o.challengeId,response,devicePublicKey:device.publicJwk})
+          setBusy(
+            'Preparing your registered phone/passkey…'
+          );
+
+          const o=await phonePasskeyFetch(
+            '/auth/password/passkey/options',
+            {
+              method:'POST',
+              headers:{
+                'Content-Type':'application/json'
+              },
+              body:JSON.stringify({
+                mfaToken:login.mfaToken
+              })
+            }
+          );
+
+          if(
+            !window.SimpleWebAuthnBrowser ||
+            typeof window.SimpleWebAuthnBrowser
+              .startAuthentication !== 'function'
+          ){
+            throw new Error(
+              'PASSKEY_LIBRARY_UNAVAILABLE'
+            );
+          }
+
+          setBusy(
+            'Browser prompt open — choose phone / another device and approve with fingerprint, face, or PIN.'
+          );
+
+          const response=
+            await window
+              .SimpleWebAuthnBrowser
+              .startAuthentication({
+                optionsJSON:o.options
+              });
+
+          setBusy(
+            'Approval received. Finishing secure sign-in…'
+          );
+
+          const verified=
+            await phonePasskeyFetch(
+              '/auth/password/passkey/verify',
+              {
+                method:'POST',
+                headers:{
+                  'Content-Type':'application/json'
+                },
+                body:JSON.stringify({
+                  mfaToken:login.mfaToken,
+                  challengeId:o.challengeId,
+                  response
+                })
+              }
+            );
+
+          if(
+            !verified?.verified ||
+            !verified?.sessionToken
+          ){
+            throw new Error(
+              'PHONE_APPROVAL_FAILED'
+            );
+          }
+
+          overlay.remove();
+
+          resolve({
+            mode:'passkey',
+            verified
           });
-          if(!verified?.verified||!verified?.sessionToken) throw new Error('PHONE_APPROVAL_FAILED');
-          overlay.remove(); resolve({mode:'passkey',verified});
+
         }catch(e){
-          running=false;
-          const code=String(e?.code||e?.name||e?.message||'');
-          if(code==='NotAllowedError'||code.includes('NotAllowed')) fail('Phone/passkey approval was cancelled or timed out. Try again, or use the 6-digit code.');
-          else if(code==='PASSWORD_STEPUP_INVALID') fail('This approval request expired. Start the password login again.');
-          else fail('Phone/passkey approval did not complete. Try again, or use the 6-digit code.');
+          const code=String(
+            e?.code ||
+            e?.name ||
+            e?.message ||
+            ''
+          );
+
+          if(
+            code==='PASSWORD_STEPUP_INVALID'
+          ){
+            fail(
+              'This approval request expired. Cancel and sign in with your password again.'
+            );
+            return;
+          }
+
+          if(
+            code==='PASSKEY_NOT_REGISTERED'
+          ){
+            fail(
+              'No passkey is registered. Use the 6-digit fallback, then add your phone from the toolbar.'
+            );
+            return;
+          }
+
+          if(
+            code==='ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY' ||
+            code==='NotAllowedError' ||
+            code.includes('NotAllowed')
+          ){
+            fail(
+              'The browser passkey prompt was cancelled or timed out. Click again, or use the 6-digit fallback.'
+            );
+            return;
+          }
+
+          if(
+            code==='AUTHENTICATION_VERIFY_FAILED' ||
+            code==='CREDENTIAL_UNKNOWN'
+          ){
+            fail(
+              'That phone/passkey could not be verified for this site. Try the registered credential or use the 6-digit fallback.'
+            );
+            return;
+          }
+
+          fail(
+            'Phone/passkey approval did not complete. Click again, or use the 6-digit fallback.'
+          );
         }
       }
 
       retry.onclick=runApproval;
-      totp.onclick=()=>{if(running)return;overlay.remove();resolve({mode:'totp'});};
-      cancel.onclick=()=>{if(running)return;overlay.remove();reject(new Error('MFA_CANCELLED'));};
-      requestAnimationFrame(()=>setTimeout(runApproval,180));
+
+      totp.onclick=()=>{
+        if(running)return;
+        overlay.remove();
+        resolve({mode:'totp'});
+      };
+
+      cancel.onclick=()=>{
+        if(running)return;
+        overlay.remove();
+        reject(
+          new Error('MFA_CANCELLED')
+        );
+      };
     });
   }
 
