@@ -66,7 +66,7 @@
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') throw new Error('NOTIFICATION_PERMISSION_DENIED');
 
-      await navigator.serviceWorker.register('./push-sw.js?v=push1', { scope: './' });
+      await navigator.serviceWorker.register('./push-sw.js?v=push2', { scope: './' });
       const reg = await navigator.serviceWorker.ready;
       let subscription = await reg.pushManager.getSubscription();
 
