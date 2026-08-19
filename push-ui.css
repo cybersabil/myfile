@@ -1,0 +1,13 @@
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f5f7fb}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:18px;background:linear-gradient(145deg,#f7f9ff,#eef3fb)}
+.push-card{width:min(430px,100%);background:#fff;border:1px solid #e4e9f2;border-radius:20px;padding:26px;box-shadow:0 24px 70px rgba(30,42,67,.13)}
+.push-badge{width:52px;height:52px;display:grid;place-items:center;border-radius:16px;background:#eef2ff;font-size:24px;margin-bottom:16px}
+h1{font-size:22px;line-height:1.2;margin:0;color:#172033;letter-spacing:-.02em}
+p{font-size:13px;line-height:1.6;color:#6c788c;margin:9px 0 0}
+.push-status{margin:18px 0 14px;padding:12px 13px;border-radius:12px;background:#f7f9fc;border:1px solid #e4e9f1;font-size:12px;line-height:1.5;color:#647087}
+.push-status.ready{background:#f5f7ff;border-color:#dce3ff;color:#5064bd}.push-status.busy{background:#f7f8ff;border-color:#dce3ff;color:#5064bd}.push-status.success{background:#f3fbf7;border-color:#cce8d8;color:#287a59}.push-status.warn{background:#fffaf1;border-color:#f0deb6;color:#936d22}.push-status.error{background:#fff7f7;border-color:#f0cfcf;color:#b34d4d}
+.primary{width:100%;min-height:48px;border:0;border-radius:12px;background:linear-gradient(120deg,#556df1,#6c7cf5);color:#fff;font-weight:700;cursor:pointer;font-size:13px}.primary:disabled{opacity:.58;cursor:wait}
+.help{margin-top:14px;padding:11px 12px;border-radius:11px;background:#fff8e9;color:#7c642c;font-size:11.5px;line-height:1.55}.hidden{display:none!important}
+.number-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}.number-choice{min-height:86px;border:1px solid #dbe2ee;background:#fff;border-radius:16px;font-size:28px;font-weight:800;color:#22304a;cursor:pointer;box-shadow:0 7px 20px rgba(30,45,80,.08)}.number-choice:active{transform:scale(.98)}.number-choice:disabled{opacity:.5;cursor:wait}
+.small{font-size:11px;color:#8a94a6;margin-top:13px;text-align:center}
