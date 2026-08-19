@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#596ff1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://cybersabil-myfile-gateway.multi4u121.workers.dev; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none';">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./push-ui.css?v=push1">
+<title>CyberSabil Phone Notifications</title>
+</head>
+<body>
+<main class="push-card">
+  <div class="push-badge">🔔</div>
+  <h1>Enable CyberSabil Phone Notifications</h1>
+  <p>Ye one-time phone enrollment hai. Iske baad daily login par QR scan nahi karna padega.</p>
+  <div id="iosHelp" class="help hidden">iPhone/iPad: Web Push ke liye is page/site ko Home Screen par web app ke roop me add karke wahi se open karna pad sakta hai.</div>
+  <div id="status" class="push-status">Checking enrollment link…</div>
+  <button id="enableBtn" class="primary" type="button" disabled>Enable Phone Notifications</button>
+  <div class="small">Notification permission sirf CyberSabil sign-in approvals ke liye use hogi.</div>
+</main>
+<script src="./push-common.js?v=push1"></script>
+<script src="./push-setup.js?v=push1"></script>
+</body>
+</html>
