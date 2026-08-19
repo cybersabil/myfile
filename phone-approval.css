@@ -45,3 +45,185 @@ html.cy-preboot::after{
 @keyframes cy-phone-shake{0%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}100%{transform:translateX(0)}}
 @media(max-width:520px){.cy-phone-approval-overlay{padding:10px}.cy-phone-approval-card{padding:20px;border-radius:15px}}
 @media(prefers-reduced-motion:reduce){html.cy-preboot::after,.cy-phone-spinner,.cy-phone-approval-card,.cy-phone-shake{animation:none!important}}
+
+
+/* CYBERSABIL_PHONE_PASSKEY_MANAGER_CSS_V2 */
+
+.cy-passkey-manager-overlay{
+  position:fixed;
+  inset:0;
+  z-index:2147483647;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(25,32,46,.48);
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+}
+
+.cy-passkey-manager-card{
+  width:min(420px,100%);
+  box-sizing:border-box;
+  padding:23px;
+  border:1px solid rgba(255,255,255,.74);
+  border-radius:17px;
+  background:#fff;
+  color:#172033;
+  box-shadow:0 28px 78px rgba(18,25,39,.22);
+  animation:cy-passkey-manager-in .2s ease-out;
+}
+
+.cy-passkey-manager-icon{
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  margin-bottom:15px;
+  border-radius:14px;
+  background:#f0f4ff;
+  font-size:23px;
+}
+
+.cy-passkey-manager-card h2{
+  margin:0;
+  color:#172033;
+  font-size:21px;
+  line-height:1.25;
+  font-weight:680;
+  letter-spacing:-.025em;
+}
+
+.cy-passkey-manager-card p{
+  margin:8px 0 0;
+  color:#778397;
+  font-size:11.5px;
+  line-height:1.58;
+}
+
+.cy-passkey-manager-status{
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  margin:16px 0 10px;
+  padding:10px 12px;
+  border:1px solid #e5eaf1;
+  border-radius:11px;
+  background:#fafbfd;
+  color:#647087;
+  font-size:10.5px;
+  line-height:1.45;
+}
+
+.cy-passkey-manager-status.busy{
+  border-color:#d9e1ff;
+  background:#f6f8ff;
+  color:#5367c8;
+}
+
+.cy-passkey-manager-status.error{
+  border-color:#efd1d1;
+  background:#fff8f8;
+  color:#b24b4b;
+}
+
+.cy-passkey-manager-status.success{
+  border-color:#cfe9dc;
+  background:#f5fcf8;
+  color:#25815d;
+}
+
+.cy-passkey-manager-code{
+  box-sizing:border-box;
+  width:100%;
+  height:48px;
+  padding:0 13px;
+  border:1px solid #dce3ec;
+  border-radius:10px;
+  outline:none;
+  background:#fbfcfe;
+  color:#172033;
+  font-size:19px;
+  letter-spacing:.19em;
+  text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+
+.cy-passkey-manager-code:focus{
+  border-color:#879df5;
+  background:#fff;
+  box-shadow:0 0 0 4px rgba(88,110,243,.08);
+}
+
+.cy-passkey-manager-btn{
+  width:100%;
+  min-height:44px;
+  margin-top:10px;
+  border:0;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:660;
+}
+
+.cy-passkey-manager-btn.primary{
+  color:#fff;
+  background:linear-gradient(120deg,#556df1,#6878f4);
+  box-shadow:0 8px 18px rgba(85,109,241,.15);
+}
+
+.cy-passkey-manager-btn.secondary{
+  color:#536078;
+  background:#f0f3f7;
+}
+
+.cy-passkey-manager-btn:disabled{
+  opacity:.56;
+  cursor:wait;
+}
+
+.cy-passkey-manager-shake{
+  animation:cy-passkey-manager-shake .34s ease;
+}
+
+#addPhonePasskeyBtn{
+  color:#465ac8;
+}
+
+@keyframes cy-passkey-manager-in{
+  from{
+    opacity:0;
+    transform:translateY(7px) scale(.989);
+  }
+  to{
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
+
+@keyframes cy-passkey-manager-shake{
+  0%{transform:translateX(0)}
+  20%{transform:translateX(-7px)}
+  40%{transform:translateX(7px)}
+  60%{transform:translateX(-5px)}
+  80%{transform:translateX(5px)}
+  100%{transform:translateX(0)}
+}
+
+@media(max-width:520px){
+  .cy-passkey-manager-overlay{
+    padding:10px;
+  }
+
+  .cy-passkey-manager-card{
+    padding:20px;
+    border-radius:15px;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .cy-passkey-manager-card,
+  .cy-passkey-manager-shake{
+    animation:none!important;
+  }
+}
