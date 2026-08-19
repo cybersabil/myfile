@@ -130,6 +130,8 @@
     });
   }
 
+  function revealUI() { document.documentElement.classList.remove('cy-preboot'); }
+
   function setMsg(msg) { authMsg.textContent = msg || ''; }
   function cleanName(v) { return String(v || '').replace(/\/+$/g, ''); }
   function pathParts(path) { return String(path || '').split('/').map(cleanName).filter(Boolean); }
@@ -168,6 +170,7 @@
     authText.textContent = initialized
       ? 'Unlock this portal with your registered passkey.'
       : 'First-time setup: enter the one-time setup code.';
+    requestAnimationFrame(revealUI);
   }
 
   function showFiles() {
@@ -356,6 +359,7 @@
       main.className = 'empty';
       main.textContent = term ? 'No matching files or folders.' : 'This folder is empty.';
       updateViewButton();
+      requestAnimationFrame(revealUI);
       return;
     }
 
@@ -409,6 +413,7 @@
       main.append(card);
     }
     updateViewButton();
+    requestAnimationFrame(revealUI);
   }
 
   function updateViewButton() { viewBtn.textContent = stateView === 'grid' ? '☷ List' : '▦ Grid'; }
@@ -501,5 +506,6 @@
   }
 
   setInterval(() => { if (!authLayer.classList.contains('hidden')) return; load(currentPath, true); }, 20000);
+  setTimeout(() => document.documentElement.classList.remove('cy-preboot'), 6000);
   boot();
 })();
