@@ -310,17 +310,68 @@
     return b;
   }
 
-  async function waitTurnstile() {
-    for(let i=0;i<100;i++){
-      if (
-        window.turnstile &&
-        typeof window.turnstile.render==='function'
-      ) return;
+  let turnstileLoadPromise = null;
 
-      await new Promise(r=>setTimeout(r,100));
+  function ensureTurnstile() {
+    if (
+      window.turnstile &&
+      typeof window.turnstile.render === 'function'
+    ) {
+      return Promise.resolve();
     }
 
-    throw new Error('TURNSTILE_NOT_READY');
+    if (turnstileLoadPromise)
+      return turnstileLoadPromise;
+
+    turnstileLoadPromise = new Promise((resolve,reject) => {
+      const started = Date.now();
+
+      let script = Array.from(document.scripts).find(x =>
+        String(x.src || '').includes(
+          'challenges.cloudflare.com/turnstile/v0/api.js'
+        )
+      );
+
+      if (!script) {
+        script=document.createElement('script');
+        script.src=
+          'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.defer=true;
+
+        document.head.appendChild(script);
+      }
+
+      script.addEventListener(
+        'error',
+        () => reject(
+          new Error('TURNSTILE_SCRIPT_BLOCKED')
+        ),
+        {once:true}
+      );
+
+      const poll=() => {
+        if (
+          window.turnstile &&
+          typeof window.turnstile.render === 'function'
+        ) {
+          resolve();
+          return;
+        }
+
+        if (Date.now()-started > 15000) {
+          reject(
+            new Error('TURNSTILE_NOT_READY')
+          );
+          return;
+        }
+
+        setTimeout(poll,100);
+      };
+
+      poll();
+    });
+
+    return turnstileLoadPromise;
   }
 
   async function getSitekey() {
@@ -330,6 +381,9 @@
       API+'/auth/status',
       {cache:'no-store'}
     );
+
+    if (!r.ok)
+      throw new Error('TURNSTILE_STATUS_FAILED');
 
     const d=await r.json();
 
@@ -342,19 +396,85 @@
   }
 
   async function addTurnstile(container,onToken) {
-    await waitTurnstile();
+    container.innerHTML='';
 
-    const key=await getSitekey();
+    container.style.cssText=
+      'box-sizing:border-box;width:100%;'+
+      'min-height:65px;margin:10px 0 12px;';
 
-    return window.turnstile.render(
-      container,
-      {
-        sitekey:key,
-        callback:t=>onToken(t),
-        'expired-callback':()=>onToken(''),
-        'error-callback':()=>onToken('')
-      }
-    );
+    const loading=document.createElement('div');
+
+    loading.textContent='Loading security check…';
+
+    loading.style.cssText=
+      'box-sizing:border-box;width:100%;min-height:56px;'+
+      'display:flex;align-items:center;justify-content:center;'+
+      'border:1px solid #e6eaf0;border-radius:10px;'+
+      'background:#fafbfd;color:#8a95a6;font-size:11px;';
+
+    container.appendChild(loading);
+
+    try {
+      await ensureTurnstile();
+
+      const key=await getSitekey();
+
+      container.innerHTML='';
+
+      const width=
+        container.getBoundingClientRect().width;
+
+      const size=
+        width > 0 && width < 300
+          ? 'compact'
+          : 'flexible';
+
+      const widgetId=window.turnstile.render(
+        container,
+        {
+          sitekey:key,
+          theme:'light',
+          size:size,
+          appearance:'always',
+
+          callback:token => {
+            onToken(token || '');
+          },
+
+          'expired-callback':() => {
+            onToken('');
+          },
+
+          'timeout-callback':() => {
+            onToken('');
+          },
+
+          'error-callback':() => {
+            onToken('');
+          }
+        }
+      );
+
+      return widgetId;
+
+    } catch(e) {
+      container.innerHTML='';
+
+      const err=document.createElement('div');
+
+      err.textContent=
+        'Security check could not load. Refresh the page and try again.';
+
+      err.style.cssText=
+        'box-sizing:border-box;width:100%;padding:11px 12px;'+
+        'border:1px solid #f0d5d5;border-radius:10px;'+
+        'background:#fff8f8;color:#a24949;'+
+        'font-size:11px;line-height:1.45;';
+
+      container.appendChild(err);
+
+      throw e;
+    }
   }
 
   async function mfaFlow(login) {
@@ -749,10 +869,20 @@
 
     authLayer.prepend(panel);
 
-    await addTurnstile(
-      ts,
-      t=>loginTurnstileToken=t
-    );
+    login.disabled=true;
+
+    try {
+      loginTurnstileId=await addTurnstile(
+        ts,
+        t=>{
+          loginTurnstileToken=t || '';
+          login.disabled=!loginTurnstileToken;
+        }
+      );
+    } catch(e) {
+      login.disabled=true;
+      console.error('Turnstile load failed:',e);
+    }
 
     login.onclick=async()=>{
       login.disabled=true;
