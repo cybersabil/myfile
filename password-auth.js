@@ -692,6 +692,123 @@
     });
   }
 
+
+  /* CYBERSABIL_PASSWORD_PHONE_PASSKEY_FRONTEND_V1 */
+
+  async function phonePasskeyTurnstileToken(host) {
+    await ensureTurnstile();
+    const key=await getSitekey();
+    host.replaceChildren();
+    const width=host.getBoundingClientRect().width;
+    const widgetSize=(width && width < 310) ? 'compact' : 'flexible';
+
+    return await new Promise((resolve,reject)=>{
+      let settled=false;
+      let widgetId=null;
+      let timer=null;
+
+      const cleanup=()=>{
+        clearTimeout(timer);
+        try { if(widgetId!==null&&window.turnstile) window.turnstile.remove(widgetId); } catch {}
+        try { host.replaceChildren(); } catch {}
+      };
+      const done=(fn,value)=>{ if(settled)return; settled=true; cleanup(); fn(value); };
+
+      try {
+        widgetId=window.turnstile.render(host,{
+          sitekey:key,
+          size:widgetSize,
+          execution:'execute',
+          appearance:'interaction-only',
+          callback:t=>done(resolve,t),
+          'error-callback':()=>done(reject,new Error('TURNSTILE_FAILED')),
+          'timeout-callback':()=>done(reject,new Error('TURNSTILE_TIMEOUT'))
+        });
+        window.turnstile.execute(widgetId);
+        timer=setTimeout(()=>done(reject,new Error('TURNSTILE_TIMEOUT')),15000);
+      } catch(e) { done(reject,e); }
+    });
+  }
+
+  async function phonePasskeyFetch(path, opts={}) {
+    const r=await chainedFetch(API+path,{...opts,cache:'no-store'});
+    let data={};
+    try { data=await r.json(); } catch {}
+    if(!r.ok){
+      const e=new Error(data.error||data.message||('HTTP_'+r.status));
+      e.code=data.error||('HTTP_'+r.status); e.status=r.status; e.payload=data;
+      throw e;
+    }
+    return data;
+  }
+
+  async function passwordPhoneApproval(login, device) {
+    return await new Promise((resolve,reject)=>{
+      const overlay=document.createElement('div');
+      overlay.className='cy-phone-approval-overlay';
+      const card=document.createElement('div');
+      card.className='cy-phone-approval-card';
+      const icon=document.createElement('div');
+      icon.className='cy-phone-icon'; icon.textContent='✓';
+      const title=document.createElement('h2'); title.textContent='Approve on your phone';
+      const description=document.createElement('p');
+      description.textContent='Your password is correct. Approve this sign-in with your registered passkey. Your browser may show your phone, a device picker, or a QR code.';
+      const state=document.createElement('div'); state.className='cy-phone-state';
+      const spinner=document.createElement('span'); spinner.className='cy-phone-spinner';
+      const stateText=document.createElement('span'); stateText.textContent='Preparing secure phone approval…';
+      state.append(spinner,stateText);
+      const retry=document.createElement('button'); retry.type='button'; retry.className='cy-phone-button primary'; retry.textContent='Approve with phone / passkey';
+      const totp=document.createElement('button'); totp.type='button'; totp.className='cy-phone-button link'; totp.textContent='Use 6-digit authenticator code instead';
+      const cancel=document.createElement('button'); cancel.type='button'; cancel.className='cy-phone-button secondary'; cancel.textContent='Cancel';
+      card.append(icon,title,description,state,retry,totp,cancel); overlay.append(card); document.body.append(overlay);
+
+      let running=false;
+      const setBusy=text=>{state.classList.remove('cy-phone-error');stateText.textContent=text;retry.disabled=true;totp.disabled=true;cancel.disabled=true;};
+      const setIdle=()=>{retry.disabled=false;totp.disabled=false;cancel.disabled=false;};
+      const fail=text=>{state.classList.add('cy-phone-error');stateText.textContent=text;card.classList.remove('cy-phone-shake');void card.offsetWidth;card.classList.add('cy-phone-shake');setTimeout(()=>card.classList.remove('cy-phone-shake'),420);setIdle();};
+
+      async function runApproval(){
+        if(running)return;
+        running=true;
+        try{
+          setBusy('Running security check…');
+          const tsToken=await phonePasskeyTurnstileToken(turnstileHost);
+          setBusy('Preparing your registered passkey…');
+          const o=await phonePasskeyFetch('/auth/login/options',{method:'POST',headers:{'Content-Type':'application/json','X-Turnstile-Token':tsToken},body:'{}'});
+          if(!window.SimpleWebAuthnBrowser||typeof window.SimpleWebAuthnBrowser.startAuthentication!=='function') throw new Error('PASSKEY_LIBRARY_UNAVAILABLE');
+          setBusy('Waiting for approval on your phone / passkey…');
+          const response=await window.SimpleWebAuthnBrowser.startAuthentication({optionsJSON:o.options});
+          setBusy('Approval received. Finishing sign-in…');
+          const verified=await phonePasskeyFetch('/auth/login/verify',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-Password-Stepup-Token':login.mfaToken},
+            body:JSON.stringify({challengeId:o.challengeId,response,devicePublicKey:device.publicJwk})
+          });
+          if(!verified?.verified||!verified?.sessionToken) throw new Error('PHONE_APPROVAL_FAILED');
+          overlay.remove(); resolve({mode:'passkey',verified});
+        }catch(e){
+          running=false;
+          const code=String(e?.code||e?.name||e?.message||'');
+          if(code==='NotAllowedError'||code.includes('NotAllowed')) fail('Phone/passkey approval was cancelled or timed out. Try again, or use the 6-digit code.');
+          else if(code==='PASSWORD_STEPUP_INVALID') fail('This approval request expired. Start the password login again.');
+          else fail('Phone/passkey approval did not complete. Try again, or use the 6-digit code.');
+        }
+      }
+
+      retry.onclick=runApproval;
+      totp.onclick=()=>{if(running)return;overlay.remove();resolve({mode:'totp'});};
+      cancel.onclick=()=>{if(running)return;overlay.remove();reject(new Error('MFA_CANCELLED'));};
+      requestAnimationFrame(()=>setTimeout(runApproval,180));
+    });
+  }
+
+  async function passwordSecondFactor(login, device) {
+    const result=await passwordPhoneApproval(login,device);
+    if(result?.mode==='passkey') return result.verified;
+    if(result?.mode==='totp') return await mfaFlow(login);
+    throw new Error('SECOND_FACTOR_FAILED');
+  }
+
   async function mfaFlow(login) {
     let setup=null;
 
@@ -976,7 +1093,7 @@
       turnstileToken
     );
 
-    const verified=await mfaFlow(login);
+    const verified=await passwordSecondFactor(login,device);
 
     localStorage.setItem(
       SESSION_KEY,
