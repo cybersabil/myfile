@@ -215,22 +215,56 @@
   });
 
   loginBtn.addEventListener('click', async () => {
-    setMsg('');
+    setMsg('Preparing secure passkey sign-in…');
     loginBtn.disabled = true;
+    loginBtn.classList.add('passkey-busy');
+    loginBtn.textContent = 'Preparing passkey…';
+
     try {
       const tsToken = await turnstileToken();
-      const o = await api('/auth/login/options', { method: 'POST', headers: { 'X-Turnstile-Token': tsToken }, body: '{}' }, false);
-      const response = await startAuthentication({ optionsJSON: o.options });
-      const v = await api('/auth/login/verify', {
-        method: 'POST', body: JSON.stringify({ challengeId: o.challengeId, response, devicePublicKey: await devicePublicJwk() })
+
+      loginBtn.textContent = 'Opening passkey prompt…';
+      setMsg('Security check complete. Waiting for your passkey…');
+
+      const o = await api('/auth/login/options', {
+        method: 'POST',
+        headers: { 'X-Turnstile-Token': tsToken },
+        body: '{}'
       }, false);
-      if (!v.verified || !v.sessionToken) throw new Error('LOGIN_FAILED');
+
+      loginBtn.textContent = 'Waiting for passkey…';
+
+      const response = await startAuthentication({
+        optionsJSON: o.options
+      });
+
+      loginBtn.textContent = 'Verifying passkey…';
+      setMsg('Passkey received. Verifying…');
+
+      const v = await api('/auth/login/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+          challengeId: o.challengeId,
+          response,
+          devicePublicKey: await devicePublicJwk()
+        })
+      }, false);
+
+      if (!v.verified || !v.sessionToken)
+        throw new Error('LOGIN_FAILED');
+
       saveSession(v.sessionToken);
       showFiles();
       await load(currentPath || '');
+
     } catch (e) {
-      setMsg('Login failed: ' + e.message);
-    } finally { loginBtn.disabled = false; }
+      setMsg('Passkey sign-in failed: ' + e.message);
+
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.classList.remove('passkey-busy');
+      loginBtn.textContent = 'Continue with Passkey';
+    }
   });
 
   logoutBtn.addEventListener('click', async () => {
