@@ -1,346 +1,370 @@
-/* CYBERSABIL_MFA_FRONTEND_SHIM_V2_QR */
-
+/* CYBERSABIL_PASSKEY_MFA_POLISHED_V3 */
 (() => {
   'use strict';
 
-  const realFetch = window.fetch.bind(window);
+  const realFetch=window.fetch.bind(window);
 
-  async function post(origin, path, body) {
-    const r = await realFetch(origin + path, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(body),
-      cache: 'no-store'
+  function onlyDigits(v){return String(v||'').replace(/\D+/g,'')}
+
+  function focusNow(input){
+    if(!input)return;
+    const run=()=>{
+      try{
+        input.focus({preventScroll:true});
+        const n=input.value?.length||0;
+        if(typeof input.setSelectionRange==='function')input.setSelectionRange(n,n);
+      }catch{}
+    };
+    requestAnimationFrame(run);
+    setTimeout(run,50);
+    setTimeout(run,150);
+  }
+
+  function shake(el){
+    el.classList.remove('cy-shake');
+    void el.offsetWidth;
+    el.classList.add('cy-shake');
+    setTimeout(()=>el.classList.remove('cy-shake'),420);
+  }
+
+  function note(node,text,tone='muted'){
+    node.className='cy-inline-note '+tone;
+    node.textContent=text||'';
+  }
+
+  async function post(origin,path,body){
+    const r=await realFetch(origin+path,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body),
+      cache:'no-store'
     });
 
-    let data = {};
-    try { data = await r.json(); } catch {}
+    let data={};
+    try{data=await r.json()}catch{}
 
-    if (!r.ok) {
-      throw new Error(
-        data.error || data.message || ('HTTP_' + r.status)
-      );
+    if(!r.ok){
+      const e=new Error(data.error||data.message||('HTTP_'+r.status));
+      e.code=data.error||('HTTP_'+r.status);
+      e.status=r.status;
+      e.payload=data;
+      throw e;
     }
-
     return data;
   }
 
-  function synthetic(original, data) {
-    const h = new Headers(original.headers);
+  function synthetic(original,data){
+    const h=new Headers(original.headers);
     h.set('Content-Type','application/json; charset=utf-8');
     h.set('Cache-Control','no-store');
-
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: h
-    });
+    return new Response(JSON.stringify(data),{status:200,headers:h});
   }
 
-  function overlay(title) {
+  function modal(title){
     const o=document.createElement('div');
-
-    o.style.cssText =
-      'position:fixed;inset:0;z-index:2147483647;' +
-      'background:rgba(0,0,0,.68);display:flex;' +
-      'align-items:center;justify-content:center;padding:18px;';
+    o.className='cy-mfa-overlay';
 
     const box=document.createElement('div');
-
-    box.style.cssText =
-      'width:min(420px,100%);max-height:90vh;overflow:auto;' +
-      'background:#fff;color:#111;border-radius:16px;' +
-      'padding:24px;font-family:system-ui,sans-serif;' +
-      'box-shadow:0 20px 60px rgba(0,0,0,.35);';
+    box.className='cy-mfa-card';
 
     const h=document.createElement('h2');
     h.textContent=title;
-    h.style.cssText='margin:0 0 16px;font-size:22px;';
-
     box.appendChild(h);
+
     o.appendChild(box);
     document.body.appendChild(o);
-
     return {o,box};
   }
 
-  function text(box, value) {
+  function paragraph(box,text){
     const p=document.createElement('p');
-    p.textContent=value;
-    p.style.cssText='line-height:1.5;margin:10px 0;';
+    p.textContent=text;
     box.appendChild(p);
     return p;
   }
 
-  function button(label) {
-    const b=document.createElement('button');
-    b.textContent=label;
-    b.style.cssText =
-      'width:100%;padding:12px;margin-top:12px;' +
-      'border:0;border-radius:9px;font-weight:700;' +
-      'cursor:pointer;background:#111;color:#fff;';
-    return b;
-  }
-
-  function codeInput(placeholder) {
+  function input(placeholder,codeMode=false){
     const i=document.createElement('input');
     i.type='text';
-    i.autocomplete='one-time-code';
-    i.inputMode='numeric';
     i.placeholder=placeholder;
-    i.style.cssText =
-      'box-sizing:border-box;width:100%;padding:13px;' +
-      'border:1px solid #aaa;border-radius:9px;' +
-      'font-size:18px;margin-top:12px;';
+    i.autocomplete=codeMode?'one-time-code':'off';
+    i.inputMode=codeMode?'numeric':'text';
+    i.className='cy-modal-input'+(codeMode?' cy-mfa-code':'');
     return i;
   }
 
-  async function setupQR(setup) {
-    return new Promise((resolve,reject) => {
-      const {o,box}=overlay('Set up Authenticator');
-
-      text(
-        box,
-        'Google Authenticator / Microsoft Authenticator / ' +
-        '2FAS se QR code scan karein.'
-      );
-
-      const qrWrap=document.createElement('div');
-      qrWrap.style.cssText=
-        'display:flex;justify-content:center;' +
-        'background:#fff;padding:12px;margin:10px 0;';
-
-      const canvas=document.createElement('canvas');
-      qrWrap.appendChild(canvas);
-      box.appendChild(qrWrap);
-
-      if (
-        typeof window.QRCode !== 'undefined' &&
-        typeof window.QRCode.toCanvas === 'function'
-      ) {
-        window.QRCode.toCanvas(
-          canvas,
-          setup.otpauthUri,
-          {width:240,margin:2},
-          err => {
-            if (err) {
-              qrWrap.textContent='QR generation failed — use manual key below.';
-            }
-          }
-        );
-      } else {
-        qrWrap.textContent='QR library unavailable — use manual key below.';
-      }
-
-      text(box,'Manual backup key:');
-
-      const secret=document.createElement('input');
-      secret.value=setup.secret;
-      secret.readOnly=true;
-      secret.style.cssText=
-        'box-sizing:border-box;width:100%;padding:10px;' +
-        'font-family:monospace;border:1px solid #bbb;' +
-        'border-radius:8px;';
-      box.appendChild(secret);
-
-      const input=codeInput('6-digit code');
-      box.appendChild(input);
-
-      const verify=button('Verify & Enable MFA');
-      box.appendChild(verify);
-
-      const cancel=button('Cancel');
-      cancel.style.background='#666';
-      box.appendChild(cancel);
-
-      verify.onclick=() => {
-        const v=input.value.trim();
-
-        if (!/^\d{6}$/.test(v)) {
-          alert('6-digit authenticator code enter karein.');
-          return;
-        }
-
-        o.remove();
-        resolve(v);
-      };
-
-      cancel.onclick=() => {
-        o.remove();
-        reject(new Error('MFA_CANCELLED'));
-      };
-
-      setTimeout(() => input.focus(),100);
-    });
+  function button(label,secondary=false){
+    const b=document.createElement('button');
+    b.type='button';
+    b.textContent=label;
+    b.className='cy-modal-btn '+(secondary?'secondary':'primary');
+    return b;
   }
 
-  async function loginMFA() {
-    return new Promise((resolve,reject) => {
-      const {o,box}=overlay('CyberSabil MFA');
-
-      text(
-        box,
-        'Authenticator ka 6-digit code enter karein. ' +
-        'Emergency me single-use recovery code bhi use kar sakte hain.'
-      );
-
-      const input=codeInput('6-digit code or recovery code');
-      box.appendChild(input);
-
-      const verify=button('Verify');
-      box.appendChild(verify);
-
-      const cancel=button('Cancel');
-      cancel.style.background='#666';
-      box.appendChild(cancel);
-
-      verify.onclick=() => {
-        const v=input.value.trim();
-
-        if (!v) return;
-
-        o.remove();
-        resolve(v);
-      };
-
-      cancel.onclick=() => {
-        o.remove();
-        reject(new Error('MFA_CANCELLED'));
-      };
-
-      setTimeout(() => input.focus(),100);
-    });
-  }
-
-  async function recoveryScreen(codes) {
-    return new Promise(resolve => {
-      const {o,box}=overlay('Save Recovery Codes');
-
-      text(
-        box,
-        'Ye 10 codes single-use emergency login codes hain. ' +
-        'Inko offline secure jagah save karein.'
-      );
+  async function recoveryScreen(codes){
+    return new Promise(resolve=>{
+      const {o,box}=modal('Save recovery codes');
+      paragraph(box,'These 10 codes are single-use emergency access codes. Save them somewhere secure and offline.');
 
       const ta=document.createElement('textarea');
       ta.readOnly=true;
       ta.value=codes.join('\n');
-      ta.style.cssText=
-        'box-sizing:border-box;width:100%;height:230px;' +
-        'padding:12px;font-family:monospace;font-size:15px;' +
-        'border:1px solid #aaa;border-radius:9px;';
+      ta.style.cssText='box-sizing:border-box;width:100%;height:220px;padding:11px;border:1px solid #dce3ec;border-radius:10px;font:13px/1.55 ui-monospace,monospace;color:#172033;background:#fbfcfe;';
       box.appendChild(ta);
 
-      const copy=button('Copy Recovery Codes');
-      box.appendChild(copy);
+      const copy=button('Copy recovery codes');
+      const done=button('I saved them',true);
+      box.append(copy,done);
 
-      copy.onclick=async () => {
-        try {
+      copy.onclick=async()=>{
+        try{
           await navigator.clipboard.writeText(ta.value);
           copy.textContent='Copied';
-        } catch {
+        }catch{
           ta.focus();
           ta.select();
         }
       };
-
-      const done=button('I Saved Them');
-      box.appendChild(done);
-
-      done.onclick=() => {
-        o.remove();
-        resolve();
-      };
+      done.onclick=()=>{o.remove();resolve()};
     });
   }
 
-  window.fetch = async function(input, init) {
-    const original=await realFetch(input,init);
+  async function challenge(origin,data){
+    let setup=null;
+    if(!data.mfaEnrolled){
+      setup=await post(origin,'/auth/mfa/enroll',{mfaToken:data.mfaToken});
+    }
+
+    return new Promise((resolve,reject)=>{
+      const {o,box}=modal(data.mfaEnrolled?'Authenticator':'Set up Authenticator');
+
+      paragraph(
+        box,
+        data.mfaEnrolled
+          ? 'Enter the 6-digit code from your authenticator. You can switch to a recovery code if needed.'
+          : 'Scan the QR code with your authenticator app, then enter the 6-digit code.'
+      );
+
+      if(!data.mfaEnrolled&&setup?.otpauthUri){
+        const wrap=document.createElement('div');
+        wrap.style.cssText='display:flex;justify-content:center;padding:8px 0 12px';
+        const canvas=document.createElement('canvas');
+        wrap.appendChild(canvas);
+        box.appendChild(wrap);
+
+        if(window.QRCode&&typeof window.QRCode.toCanvas==='function'){
+          window.QRCode.toCanvas(canvas,setup.otpauthUri,{width:220,margin:2});
+        }
+
+        const manual=document.createElement('input');
+        manual.readOnly=true;
+        manual.value=setup.secret||'';
+        manual.className='cy-modal-input';
+        manual.style.fontFamily='ui-monospace,monospace';
+        box.appendChild(manual);
+      }
+
+      let mode='totp';
+
+      const toggle=document.createElement('button');
+      toggle.type='button';
+      toggle.style.cssText='width:100%;padding:5px 0 8px;border:0;background:transparent;color:#5c6ed6;font-size:11px;font-weight:620;cursor:pointer;';
+      if(data.mfaEnrolled){
+        toggle.textContent='Use recovery code instead';
+        box.appendChild(toggle);
+      }
+
+      const field=input('6-digit code',true);
+      box.appendChild(field);
+
+      const msg=document.createElement('div');
+      note(msg,'Type all 6 digits — verification starts automatically.','muted');
+      box.appendChild(msg);
+
+      const verify=button(data.mfaEnrolled?'Verify':'Verify & enable MFA');
+      const cancel=button('Cancel',true);
+      box.append(verify,cancel);
+
+      let pending=false;
+      let timer=null;
+
+      function setMode(next){
+        mode=next;
+        clearTimeout(timer);
+        field.value='';
+        field.classList.remove('cy-input-error');
+
+        if(mode==='totp'){
+          field.placeholder='6-digit code';
+          field.inputMode='numeric';
+          field.classList.add('cy-mfa-code');
+          toggle.textContent='Use recovery code instead';
+          note(msg,'Type all 6 digits — verification starts automatically.','muted');
+        }else{
+          field.placeholder='Recovery code';
+          field.inputMode='text';
+          field.classList.remove('cy-mfa-code');
+          toggle.textContent='Use 6-digit code instead';
+          note(msg,'Enter one unused recovery code and press Enter or Verify.','muted');
+        }
+        focusNow(field);
+      }
+
+      async function submit(){
+        if(pending)return;
+
+        const raw=field.value.trim();
+        if(mode==='totp'){
+          field.value=onlyDigits(raw).slice(0,6);
+          if(!/^\d{6}$/.test(field.value)){
+            field.classList.add('cy-input-error');
+            note(msg,'Enter a valid 6-digit code.','error');
+            shake(box);
+            focusNow(field);
+            return;
+          }
+        }else if(!raw){
+          field.classList.add('cy-input-error');
+          note(msg,'Enter a recovery code.','error');
+          shake(box);
+          focusNow(field);
+          return;
+        }
+
+        pending=true;
+        field.disabled=true;
+        verify.disabled=true;
+        cancel.disabled=true;
+        toggle.disabled=true;
+        note(msg,'Verifying…','muted');
+
+        try{
+          let result;
+          if(mode==='totp'){
+            result=await post(origin,'/auth/mfa/verify',{
+              mfaToken:data.mfaToken,
+              code:field.value.trim()
+            });
+          }else{
+            result=await post(origin,'/auth/mfa/recovery',{
+              mfaToken:data.mfaToken,
+              code:raw
+            });
+          }
+
+          o.remove();
+
+          if(Array.isArray(result.recoveryCodes)&&result.recoveryCodes.length){
+            await recoveryScreen(result.recoveryCodes);
+          }
+          resolve(result);
+
+        }catch(e){
+          pending=false;
+          field.disabled=false;
+          verify.disabled=false;
+          cancel.disabled=false;
+          toggle.disabled=false;
+
+          const c=String(e.code||'');
+
+          if([
+            'MFA_DENIED',
+            'MFA_DENIED_OR_REPLAY',
+            'MFA_CODE_REPLAY',
+            'MFA_PENDING_INVALID',
+            'RECOVERY_DENIED',
+            'HTTP_401'
+          ].includes(c)){
+            field.value='';
+            field.classList.add('cy-input-error');
+            note(
+              msg,
+              mode==='totp'
+                ? 'Incorrect or expired code. Try again.'
+                : 'Recovery code is invalid or already used.',
+              'error'
+            );
+            shake(box);
+            focusNow(field);
+            return;
+          }
+
+          if(['MFA_LOCKED','LOGIN_LOCKED','RATE_LIMITED','HTTP_429'].includes(c)){
+            note(msg,'Too many attempts. Please wait before trying again.','error');
+            shake(box);
+            focusNow(field);
+            return;
+          }
+
+          note(msg,'Verification failed. Please try again.','error');
+          shake(box);
+          focusNow(field);
+        }
+      }
+
+      if(data.mfaEnrolled){
+        toggle.onclick=()=>setMode(mode==='totp'?'recovery':'totp');
+      }
+
+      field.addEventListener('input',()=>{
+        field.classList.remove('cy-input-error');
+        if(mode!=='totp')return;
+        field.value=onlyDigits(field.value).slice(0,6);
+        clearTimeout(timer);
+        if(field.value.length===6)timer=setTimeout(submit,220);
+      });
+
+      field.addEventListener('keydown',e=>{
+        if(e.key!=='Enter'||e.isComposing)return;
+        e.preventDefault();
+        submit();
+      });
+
+      verify.onclick=submit;
+      cancel.onclick=()=>{o.remove();reject(new Error('MFA_CANCELLED'))};
+
+      focusNow(field);
+    });
+  }
+
+  window.fetch=async function(inputArg,init){
+    const original=await realFetch(inputArg,init);
 
     let u;
-    try {
-      const raw=input instanceof Request ? input.url : String(input);
+    try{
+      const raw=inputArg instanceof Request?inputArg.url:String(inputArg);
       u=new URL(raw,window.location.href);
-    } catch {
+    }catch{
       return original;
     }
 
-    if (
-      original.status !== 200 ||
+    if(
+      original.status!==200 ||
       !(
         u.pathname.endsWith('/auth/login/verify') ||
         u.pathname.endsWith('/auth/register/verify')
       )
-    ) {
+    ){
       return original;
     }
 
     let data;
-    try {
-      data=await original.clone().json();
-    } catch {
-      return original;
-    }
+    try{data=await original.clone().json()}catch{return original}
 
-    if (!data?.mfaRequired || !data?.mfaToken) {
-      return original;
-    }
+    if(!data?.mfaRequired||!data?.mfaToken)return original;
 
-    try {
-      let entered;
-
-      if (!data.mfaEnrolled) {
-        const setup=await post(
-          u.origin,
-          '/auth/mfa/enroll',
-          {mfaToken:data.mfaToken}
-        );
-
-        entered=await setupQR(setup);
-      } else {
-        entered=await loginMFA();
-      }
-
-      let verified;
-
-      if (/^\d{6}$/.test(entered)) {
-        verified=await post(
-          u.origin,
-          '/auth/mfa/verify',
-          {
-            mfaToken:data.mfaToken,
-            code:entered
-          }
-        );
-      } else {
-        verified=await post(
-          u.origin,
-          '/auth/mfa/recovery',
-          {
-            mfaToken:data.mfaToken,
-            code:entered
-          }
-        );
-      }
-
-      if (Array.isArray(verified.recoveryCodes)) {
-        await recoveryScreen(verified.recoveryCodes);
-      }
-
+    try{
+      const verified=await challenge(u.origin,data);
       return synthetic(original,{
         verified:true,
         sessionToken:verified.sessionToken,
         expiresAt:verified.expiresAt
       });
-
-    } catch(e) {
-      alert(
-        'MFA verification failed: ' +
-        (e?.message || 'UNKNOWN_ERROR')
-      );
-
+    }catch(e){
       return new Response(JSON.stringify({
         error:'MFA_FAILED',
-        message:e?.message || 'MFA_FAILED'
+        message:e?.message||'MFA_FAILED'
       }),{
         status:401,
         headers:{'Content-Type':'application/json'}
