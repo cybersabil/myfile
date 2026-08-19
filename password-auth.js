@@ -975,7 +975,10 @@
     localStorage.setItem(MODE_KEY,'password');
     localStorage.setItem(USER_KEY,username);
 
-    location.reload();
+    window.dispatchEvent(new CustomEvent(
+      'cybersabil:session-ready',
+      { detail: { sessionToken: verified.sessionToken } }
+    ));
   }
 
   async function showForgot() {
