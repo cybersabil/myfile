@@ -31,6 +31,7 @@
   let currentItems = [];
   let stateView = localStorage.getItem('cybersabil-download-view') || 'grid';
   let loading = false;
+  let currentSignature = '';
 
   let turnstileSitekey = '';
   let turnstileWidget = null;
@@ -173,6 +174,17 @@
     topbar.classList.remove('auth-mode');
     authLayer.classList.add('hidden');
     filesArea.classList.remove('hidden');
+  }
+
+  function showSkeleton(count = 8) {
+    main.className = 'cy-skeleton-grid';
+    main.replaceChildren();
+    for (let i = 0; i < count; i++) {
+      const x = document.createElement('div');
+      x.className = 'cy-skeleton';
+      x.setAttribute('aria-hidden','true');
+      main.append(x);
+    }
   }
 
   async function status() { const s = await api('/auth/status', { method: 'GET' }, false); turnstileSitekey = s.turnstileSitekey || ''; initTurnstile(); return s; }
@@ -319,6 +331,8 @@
     for (const item of items) {
       const card = document.createElement('div');
       card.className = 'item' + (item.isDir ? ' folder' : '');
+      card.tabIndex = 0;
+      card.setAttribute('role','group');
 
       const icon = document.createElement('div');
       icon.className = 'icon'; icon.textContent = iconFor(item);
@@ -339,7 +353,7 @@
         openBtn.className = 'action secondary'; openBtn.type = 'button'; openBtn.textContent = 'Open';
         openBtn.addEventListener('click', e => { e.stopPropagation(); load(path); });
         const zipBtn = document.createElement('button');
-        zipBtn.className = 'action'; zipBtn.type = 'button'; zipBtn.textContent = 'ZIP';
+        zipBtn.className = 'action'; zipBtn.type = 'button'; zipBtn.textContent = 'Download ZIP';
         zipBtn.addEventListener('click', e => { e.stopPropagation(); download('folder', path); });
         actions.append(openBtn, zipBtn); card.append(actions);
         card.title = 'Open folder'; card.addEventListener('click', () => load(path));
@@ -348,10 +362,16 @@
         openBtn.className = 'action secondary'; openBtn.type = 'button'; openBtn.textContent = 'Open';
         openBtn.addEventListener('click', e => { e.stopPropagation(); openFile(path, item.name); });
         const dlBtn = document.createElement('button');
-        dlBtn.className = 'action'; dlBtn.type = 'button'; dlBtn.textContent = '↓'; dlBtn.title = 'Download file';
+        dlBtn.className = 'action'; dlBtn.type = 'button'; dlBtn.textContent = 'Download'; dlBtn.title = 'Download file';
         dlBtn.addEventListener('click', e => { e.stopPropagation(); download('file', path); });
         actions.append(openBtn, dlBtn); card.append(actions);
       }
+      card.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || e.isComposing) return;
+        e.preventDefault();
+        if (item.isDir) load(path);
+        else openFile(path, item.name);
+      });
       main.append(card);
     }
     updateViewButton();
@@ -362,11 +382,16 @@
   async function load(path, silent = false) {
     if (loading) return;
     loading = true;
-    if (!silent) { main.className = 'loading'; main.textContent = 'Loading files…'; }
+    if (!silent) showSkeleton();
     try {
       const d = await api('/api/list?path=' + encodeURIComponent(path || ''), { method: 'GET' });
-      currentPath = d.path || '';
-      currentItems = Array.isArray(d.items) ? d.items : [];
+      const nextPath = d.path || '';
+      const nextItems = Array.isArray(d.items) ? d.items : [];
+      const nextSignature = JSON.stringify([nextPath,nextItems]);
+      if (silent && nextSignature === currentSignature) return;
+      currentPath = nextPath;
+      currentItems = nextItems;
+      currentSignature = nextSignature;
       showFiles(); render();
     } catch (e) {
       if (e.status === 401) {
@@ -385,6 +410,23 @@
   });
   refreshBtn.addEventListener('click', () => load(currentPath));
   search.addEventListener('input', render);
+  search.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      search.value = '';
+      render();
+      search.blur();
+      return;
+    }
+    if (e.key !== 'Enter') return;
+    const term = search.value.trim().toLowerCase();
+    const matches = currentItems.filter(x => !term || String(x.name || '').toLowerCase().includes(term));
+    if (matches.length !== 1) return;
+    e.preventDefault();
+    const item = matches[0];
+    const p = joinPath(currentPath, item.name);
+    if (item.isDir) load(p);
+    else openFile(p, item.name);
+  });
   viewBtn.addEventListener('click', () => {
     stateView = stateView === 'grid' ? 'list' : 'grid';
     localStorage.setItem('cybersabil-download-view', stateView); render();
@@ -392,6 +434,23 @@
   $('closePreview').addEventListener('click', () => { previewFrame.src = 'about:blank'; previewModal.classList.add('hidden'); });
   previewModal.addEventListener('click', e => {
     if (e.target === previewModal) { previewFrame.src = 'about:blank'; previewModal.classList.add('hidden'); }
+  });
+
+
+  window.addEventListener('cybersabil:session-ready', async (e) => {
+    const sessionToken = e?.detail?.sessionToken || '';
+    if (!sessionToken) return;
+    saveSession(sessionToken);
+    document.documentElement.classList.add('cy-auth-handoff');
+    showFiles();
+    showSkeleton();
+    try {
+      await load(currentPath || '');
+    } finally {
+      requestAnimationFrame(() => {
+        document.documentElement.classList.remove('cy-auth-handoff');
+      });
+    }
   });
 
   async function boot() {
