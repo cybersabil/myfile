@@ -155,6 +155,11 @@
     return data;
   }
 
+  // CYBERSABIL_SECURE_API_EXPORT_V2
+  // Same-origin self-hosted management UI may call the existing
+  // hardened API helper; session + device proof remain enforced.
+  window.CyberSabilSecureApi = api;
+
   function saveSession(t) {
     token = t || '';
     if (token) localStorage.setItem('myfile_session', token);
