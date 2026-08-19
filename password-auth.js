@@ -386,6 +386,7 @@
 
   function makeOverlay(title) {
     const bg=document.createElement('div');
+    bg.className='cy-mfa-overlay';
 
     bg.style.cssText=
       'position:fixed;inset:0;z-index:2147483647;'+
@@ -393,6 +394,7 @@
       'background:rgba(8,12,18,.52);padding:18px;';
 
     const box=document.createElement('div');
+    box.className='cy-mfa-card';
 
     box.style.cssText=
       'box-sizing:border-box;width:min(420px,100%);max-height:92vh;'+
@@ -416,6 +418,7 @@
 
   function field(type,placeholder,value='') {
     const x=document.createElement('input');
+    x.className='cy-modal-input';
 
     x.type=type;
     x.placeholder=placeholder;
@@ -431,6 +434,7 @@
 
   function btn(label,secondary=false) {
     const b=document.createElement('button');
+    b.className='cy-modal-btn '+(secondary?'secondary':'primary');
 
     b.type='button';
     b.textContent=label;
@@ -756,6 +760,7 @@
       const input=field('text','6-digit code');
       input.inputMode='numeric';
       input.autocomplete='one-time-code';
+      input.classList.add('cy-mfa-code');
       box.appendChild(input);
 
       const note=document.createElement('div');
@@ -873,6 +878,7 @@
           const code=String(e.code || '');
 
           if (
+            code === 'MFA_DENIED' ||
             code === 'MFA_DENIED_OR_REPLAY' ||
             code === 'MFA_CODE_REPLAY' ||
             code === 'MFA_PENDING_INVALID' ||
@@ -895,7 +901,12 @@
             return;
           }
 
-          if (code === 'HTTP_429' || code === 'LOGIN_LOCKED') {
+          if (
+            code === 'MFA_LOCKED' ||
+            code === 'RATE_LIMITED' ||
+            code === 'HTTP_429' ||
+            code === 'LOGIN_LOCKED'
+          ) {
             setNote(
               note,
               'Too many attempts. Please wait and try again.',
