@@ -1,4 +1,4 @@
-/* CYBERSABIL_PASSWORD_PRIMARY_FRONTEND_V1 */
+/* CYBERSABIL_GLOBAL_KEYBOARD_UX_V1 */
 
 (() => {
   'use strict';
@@ -16,6 +16,53 @@
   let sitekey='';
   let loginTurnstileId=null;
   let loginTurnstileToken='';
+  let turnstileLoadPromise=null;
+
+  function injectStyles() {
+    if (document.getElementById('cybersabilKeyboardUxStyle')) return;
+
+    const style=document.createElement('style');
+    style.id='cybersabilKeyboardUxStyle';
+    style.textContent=`
+      .cy-inline-note{
+        margin-top:10px;
+        font-size:11px;
+        line-height:1.45;
+        min-height:16px;
+      }
+      .cy-inline-note.error{ color:#b14646; }
+      .cy-inline-note.success{ color:#1f7a57; }
+      .cy-inline-note.muted{ color:#8b96a8; }
+
+      .cy-input-error{
+        border-color:#e36b6b !important;
+        box-shadow:0 0 0 3px rgba(227,107,107,.10) !important;
+      }
+
+      .cy-shake{
+        animation:cyshake .35s ease;
+      }
+
+      @keyframes cyshake{
+        0%{transform:translateX(0)}
+        20%{transform:translateX(-7px)}
+        40%{transform:translateX(7px)}
+        60%{transform:translateX(-5px)}
+        80%{transform:translateX(5px)}
+        100%{transform:translateX(0)}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function visible(el) {
+    return Boolean(
+      el &&
+      el.isConnected &&
+      el.offsetParent !== null &&
+      getComputedStyle(el).visibility !== 'hidden'
+    );
+  }
 
   function b64url(bytes) {
     let s='';
@@ -41,6 +88,87 @@
         te.encode(text)
       )
     );
+  }
+
+  function onlyDigits(v) {
+    return String(v || '').replace(/\D+/g,'');
+  }
+
+  function shake(el) {
+    if (!el) return;
+    el.classList.remove('cy-shake');
+    void el.offsetWidth;
+    el.classList.add('cy-shake');
+    setTimeout(() => el.classList.remove('cy-shake'), 420);
+  }
+
+  function setNote(node, text='', tone='muted') {
+    if (!node) return;
+    node.className='cy-inline-note ' + tone;
+    node.textContent=text || '';
+  }
+
+  function clearInputError(...inputs) {
+    inputs.flat().forEach(x => x?.classList?.remove('cy-input-error'));
+  }
+
+  function markInputError(input) {
+    input?.classList?.add('cy-input-error');
+  }
+
+  function focusInputNow(input) {
+    if (!input || !visible(input)) return;
+
+    input.autofocus=true;
+
+    const run = () => {
+      try {
+        input.focus({preventScroll:true});
+        if (typeof input.setSelectionRange === 'function') {
+          const n = input.value?.length || 0;
+          input.setSelectionRange(n,n);
+        }
+      } catch {}
+    };
+
+    requestAnimationFrame(run);
+    setTimeout(run, 50);
+    setTimeout(run, 160);
+  }
+
+  function enterSubmits(input, callback) {
+    if (!input || !callback) return;
+
+    input.addEventListener('keydown', e => {
+      if (
+        e.key !== 'Enter' ||
+        e.shiftKey ||
+        e.ctrlKey ||
+        e.altKey ||
+        e.metaKey ||
+        e.isComposing
+      ) return;
+
+      e.preventDefault();
+      callback();
+    });
+  }
+
+  function autoSubmitSixDigits(input, callback) {
+    if (!input || !callback) return;
+
+    let timer=null;
+
+    input.addEventListener('input', () => {
+      input.value = onlyDigits(input.value).slice(0,6);
+      clearTimeout(timer);
+
+      if (input.value.length === 6) {
+        timer = setTimeout(() => {
+          callback();
+        }, 240);
+      }
+    });
   }
 
   function openDeviceDB() {
@@ -243,10 +371,15 @@
 
     try { d=await r.json(); } catch {}
 
-    if (!r.ok)
-      throw new Error(
-        d.error || ('HTTP_'+r.status)
+    if (!r.ok) {
+      const err=new Error(
+        d.error || d.message || ('HTTP_'+r.status)
       );
+      err.code = d.error || ('HTTP_'+r.status);
+      err.status = r.status;
+      err.payload = d;
+      throw err;
+    }
 
     return d;
   }
@@ -257,19 +390,22 @@
     bg.style.cssText=
       'position:fixed;inset:0;z-index:2147483647;'+
       'display:flex;align-items:center;justify-content:center;'+
-      'background:rgba(0,0,0,.72);padding:18px;';
+      'background:rgba(8,12,18,.52);padding:18px;';
 
     const box=document.createElement('div');
 
     box.style.cssText=
-      'box-sizing:border-box;width:min(430px,100%);'+
-      'max-height:92vh;overflow:auto;background:#fff;color:#111;'+
-      'border-radius:16px;padding:24px;'+
-      'font-family:system-ui,sans-serif;';
+      'box-sizing:border-box;width:min(420px,100%);max-height:92vh;'+
+      'overflow:auto;background:#fff;color:#111;'+
+      'border-radius:16px;padding:22px;'+
+      'font-family:system-ui,sans-serif;'+
+      'box-shadow:0 22px 60px rgba(0,0,0,.18);';
 
     const h=document.createElement('h2');
     h.textContent=title;
-    h.style.margin='0 0 16px';
+    h.style.cssText=
+      'margin:0 0 12px;font-size:22px;'+
+      'line-height:1.2;color:#182132;';
 
     box.appendChild(h);
     bg.appendChild(box);
@@ -287,8 +423,8 @@
 
     x.style.cssText=
       'box-sizing:border-box;width:100%;padding:12px;'+
-      'margin:7px 0;border:1px solid #bbb;border-radius:9px;'+
-      'font-size:16px;';
+      'margin:7px 0;border:1px solid #d9e0ea;border-radius:10px;'+
+      'font-size:15px;background:#fff;color:#172033;outline:none;';
 
     return x;
   }
@@ -301,16 +437,67 @@
 
     b.style.cssText=
       'box-sizing:border-box;width:100%;padding:12px;'+
-      'margin-top:9px;border:0;border-radius:9px;'+
-      'cursor:pointer;font-weight:700;'+
+      'margin-top:10px;border:0;border-radius:10px;'+
+      'cursor:pointer;font-weight:700;font-size:13px;'+
       (secondary
-        ? 'background:#eee;color:#111;'
+        ? 'background:#eef2f7;color:#243149;'
         : 'background:#111;color:#fff;');
 
     return b;
   }
 
-  let turnstileLoadPromise = null;
+  function findSearchInput() {
+    const selectors = [
+      '#searchInput',
+      '#search',
+      'input[type="search"]',
+      'input[placeholder*="search" i]',
+      'input[aria-label*="search" i]'
+    ];
+
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (visible(el)) return el;
+    }
+    return null;
+  }
+
+  function installGlobalSearchHotkeys() {
+    if (window.__cySearchHotkeysInstalled) return;
+    window.__cySearchHotkeysInstalled = true;
+
+    document.addEventListener('keydown', e => {
+      const active = document.activeElement;
+      const typing =
+        active &&
+        (active.tagName === 'INPUT' ||
+         active.tagName === 'TEXTAREA' ||
+         active.isContentEditable);
+
+      if (
+        !typing &&
+        (
+          (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) ||
+          ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')
+        )
+      ) {
+        const input = findSearchInput();
+        if (input) {
+          e.preventDefault();
+          focusInputNow(input);
+        }
+      }
+
+      if (
+        active &&
+        active === findSearchInput() &&
+        e.key === 'Escape'
+      ) {
+        active.value = '';
+        active.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    });
+  }
 
   function ensureTurnstile() {
     if (
@@ -337,7 +524,6 @@
         script.src=
           'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
         script.defer=true;
-
         document.head.appendChild(script);
       }
 
@@ -399,13 +585,10 @@
     container.innerHTML='';
 
     container.style.cssText=
-      'box-sizing:border-box;width:100%;'+
-      'min-height:65px;margin:10px 0 12px;';
+      'box-sizing:border-box;width:100%;min-height:65px;margin:10px 0 12px;';
 
     const loading=document.createElement('div');
-
     loading.textContent='Loading security check…';
-
     loading.style.cssText=
       'box-sizing:border-box;width:100%;min-height:56px;'+
       'display:flex;align-items:center;justify-content:center;'+
@@ -416,7 +599,6 @@
 
     try {
       await ensureTurnstile();
-
       const key=await getSitekey();
 
       container.innerHTML='';
@@ -441,17 +623,9 @@
             onToken(token || '');
           },
 
-          'expired-callback':() => {
-            onToken('');
-          },
-
-          'timeout-callback':() => {
-            onToken('');
-          },
-
-          'error-callback':() => {
-            onToken('');
-          }
+          'expired-callback':() => onToken(''),
+          'timeout-callback':() => onToken(''),
+          'error-callback':() => onToken('')
         }
       );
 
@@ -461,176 +635,317 @@
       container.innerHTML='';
 
       const err=document.createElement('div');
-
       err.textContent=
         'Security check could not load. Refresh the page and try again.';
-
       err.style.cssText=
         'box-sizing:border-box;width:100%;padding:11px 12px;'+
         'border:1px solid #f0d5d5;border-radius:10px;'+
-        'background:#fff8f8;color:#a24949;'+
-        'font-size:11px;line-height:1.45;';
+        'background:#fff8f8;color:#a24949;font-size:11px;line-height:1.45;';
 
       container.appendChild(err);
-
       throw e;
     }
   }
 
+  async function recoveryScreen(codes) {
+    const {bg,box}=makeOverlay('Save Recovery Codes');
+
+    const p=document.createElement('p');
+    p.textContent=
+      'Ye 10 single-use recovery codes hain. Inko secure offline jagah save karein.';
+    p.style.cssText='margin:0 0 12px;color:#5a6679;font-size:13px;line-height:1.55;';
+    box.appendChild(p);
+
+    const ta=document.createElement('textarea');
+    ta.readOnly=true;
+    ta.value=codes.join('\n');
+    ta.style.cssText=
+      'box-sizing:border-box;width:100%;height:220px;'+
+      'padding:10px;font-family:monospace;font-size:14px;'+
+      'border:1px solid #dbe2ec;border-radius:10px;';
+    box.appendChild(ta);
+
+    const copy=btn('Copy Codes');
+    const done=btn('I Saved Them');
+
+    box.appendChild(copy);
+    box.appendChild(done);
+
+    copy.onclick=async()=>{
+      try {
+        await navigator.clipboard.writeText(ta.value);
+        copy.textContent='Copied';
+      } catch {
+        ta.select();
+      }
+    };
+
+    return await new Promise(resolve=>{
+      done.onclick=()=>{
+        bg.remove();
+        resolve();
+      };
+    });
+  }
+
   async function mfaFlow(login) {
-    let entered='';
+    let setup=null;
 
     if (!login.mfaEnrolled) {
-      const setup=await post(
+      setup=await post(
         '/auth/mfa/enroll',
         {mfaToken:login.mfaToken}
       );
+    }
 
+    return await new Promise((resolve,reject) => {
       const {bg,box}=makeOverlay(
-        'Set up Authenticator'
+        login.mfaEnrolled ? 'Authenticator' : 'Set up Authenticator'
       );
 
-      const p=document.createElement('p');
-      p.textContent=
-        'Authenticator app se QR scan karein.';
-      box.appendChild(p);
+      const intro=document.createElement('p');
+      intro.style.cssText='margin:0 0 12px;color:#5a6679;font-size:13px;line-height:1.55;';
+      intro.textContent = login.mfaEnrolled
+        ? 'Authenticator ka 6-digit code enter karein. Recovery code use karna ho to neeche toggle karein.'
+        : 'Authenticator app se QR scan karein aur 6-digit code enter karein.';
+      box.appendChild(intro);
 
-      const canvas=document.createElement('canvas');
-      canvas.style.cssText=
-        'display:block;margin:12px auto;';
-      box.appendChild(canvas);
+      if (!login.mfaEnrolled && setup?.otpauthUri) {
+        const qrWrap=document.createElement('div');
+        qrWrap.style.cssText='display:flex;justify-content:center;margin:10px 0 12px;';
+        const canvas=document.createElement('canvas');
+        qrWrap.appendChild(canvas);
+        box.appendChild(qrWrap);
 
-      if (
-        window.QRCode &&
-        typeof window.QRCode.toCanvas==='function'
-      ) {
-        await window.QRCode.toCanvas(
-          canvas,
-          setup.otpauthUri,
-          {width:240,margin:2}
-        );
+        if (
+          window.QRCode &&
+          typeof window.QRCode.toCanvas==='function'
+        ) {
+          window.QRCode.toCanvas(canvas, setup.otpauthUri, {width:220,margin:2});
+        }
+
+        const manualLabel=document.createElement('div');
+        manualLabel.textContent='Manual setup key';
+        manualLabel.style.cssText='margin:2px 0 6px;font-size:11px;color:#748094;font-weight:600;';
+        box.appendChild(manualLabel);
+
+        const manual=document.createElement('input');
+        manual.readOnly=true;
+        manual.value=setup.secret || '';
+        manual.style.cssText=
+          'box-sizing:border-box;width:100%;padding:10px;'+
+          'font-family:monospace;font-size:13px;'+
+          'border:1px solid #dbe2ec;border-radius:10px;margin-bottom:8px;';
+        box.appendChild(manual);
       }
 
-      const manual=document.createElement('input');
-      manual.readOnly=true;
-      manual.value=setup.secret;
-      manual.style.cssText=
-        'box-sizing:border-box;width:100%;padding:10px;'+
-        'font-family:monospace;margin:8px 0;';
-      box.appendChild(manual);
+      let mode='totp';
 
-      const code=field(
-        'text',
-        '6-digit authenticator code'
+      const modeToggle=document.createElement('button');
+      modeToggle.type='button';
+      modeToggle.style.cssText=
+        'width:100%;padding:8px 0;margin:0 0 8px;'+
+        'border:0;background:transparent;color:#5b6df5;'+
+        'font-size:12px;font-weight:600;cursor:pointer;';
+
+      if (login.mfaEnrolled) {
+        modeToggle.textContent='Use recovery code instead';
+        box.appendChild(modeToggle);
+      }
+
+      const input=field('text','6-digit code');
+      input.inputMode='numeric';
+      input.autocomplete='one-time-code';
+      box.appendChild(input);
+
+      const note=document.createElement('div');
+      note.className='cy-inline-note muted';
+      note.textContent='Enter the 6-digit code from your authenticator app.';
+      box.appendChild(note);
+
+      const verify=btn(
+        login.mfaEnrolled ? 'Verify' : 'Verify & Enable MFA'
       );
-      code.inputMode='numeric';
-      box.appendChild(code);
-
-      const verify=btn('Verify & Enable MFA');
       box.appendChild(verify);
 
-      entered=await new Promise((resolve,reject)=>{
-        verify.onclick=()=>{
-          const v=code.value.trim();
+      const cancel=btn('Cancel',true);
+      box.appendChild(cancel);
 
-          if (!/^\d{6}$/.test(v)) {
-            alert('6-digit code enter karein.');
+      let pending=false;
+      let autoTimer=null;
+
+      function setMode(next) {
+        mode=next;
+
+        clearTimeout(autoTimer);
+        input.value='';
+        clearInputError(input);
+
+        if (mode === 'totp') {
+          input.placeholder='6-digit code';
+          input.inputMode='numeric';
+          note.textContent='Enter the 6-digit code from your authenticator app.';
+          modeToggle.textContent='Use recovery code instead';
+        } else {
+          input.placeholder='Recovery code';
+          input.inputMode='text';
+          note.textContent='Enter one unused recovery code.';
+          modeToggle.textContent='Use 6-digit code instead';
+        }
+
+        focusInputNow(input);
+      }
+
+      async function submit() {
+        if (pending) return;
+
+        clearTimeout(autoTimer);
+        clearInputError(input);
+
+        const raw=input.value.trim();
+
+        if (mode === 'totp') {
+          input.value = onlyDigits(raw).slice(0,6);
+
+          if (!/^\d{6}$/.test(input.value)) {
+            markInputError(input);
+            setNote(note,'Enter a valid 6-digit code.','error');
+            shake(box);
+            focusInputNow(input);
             return;
+          }
+        } else {
+          if (!raw) {
+            markInputError(input);
+            setNote(note,'Enter a recovery code.','error');
+            shake(box);
+            focusInputNow(input);
+            return;
+          }
+        }
+
+        pending=true;
+        verify.disabled=true;
+        cancel.disabled=true;
+        modeToggle.disabled=true;
+        input.disabled=true;
+        setNote(note,'Verifying…','muted');
+
+        try {
+          let verified;
+
+          if (mode === 'totp') {
+            verified=await post(
+              '/auth/mfa/verify',
+              {
+                mfaToken:login.mfaToken,
+                code:input.value.trim()
+              }
+            );
+          } else {
+            verified=await post(
+              '/auth/mfa/recovery',
+              {
+                mfaToken:login.mfaToken,
+                code:raw
+              }
+            );
           }
 
           bg.remove();
-          resolve(v);
-        };
-      });
-    } else {
-      const {bg,box}=makeOverlay('Authenticator');
 
-      const code=field(
-        'text',
-        '6-digit code or recovery code'
-      );
-      box.appendChild(code);
+          if (
+            Array.isArray(verified.recoveryCodes) &&
+            verified.recoveryCodes.length
+          ) {
+            await recoveryScreen(verified.recoveryCodes);
+          }
 
-      const verify=btn('Continue');
-      box.appendChild(verify);
+          resolve(verified);
 
-      entered=await new Promise(resolve=>{
-        verify.onclick=()=>{
-          const v=code.value.trim();
-          if (!v) return;
-          bg.remove();
-          resolve(v);
-        };
-      });
-    }
+        } catch(e) {
+          pending=false;
+          verify.disabled=false;
+          cancel.disabled=false;
+          modeToggle.disabled=false;
+          input.disabled=false;
 
-    let verified;
+          const code=String(e.code || '');
 
-    if (/^\d{6}$/.test(entered)) {
-      verified=await post(
-        '/auth/mfa/verify',
-        {
-          mfaToken:login.mfaToken,
-          code:entered
-        }
-      );
-    } else {
-      verified=await post(
-        '/auth/mfa/recovery',
-        {
-          mfaToken:login.mfaToken,
-          code:entered
-        }
-      );
-    }
+          if (
+            code === 'MFA_DENIED_OR_REPLAY' ||
+            code === 'MFA_CODE_REPLAY' ||
+            code === 'MFA_PENDING_INVALID' ||
+            code === 'RECOVERY_DENIED' ||
+            code === 'HTTP_401'
+          ) {
+            input.value='';
+            markInputError(input);
 
-    if (
-      Array.isArray(verified.recoveryCodes) &&
-      verified.recoveryCodes.length
-    ) {
-      const {bg,box}=makeOverlay(
-        'Save Recovery Codes'
-      );
+            setNote(
+              note,
+              mode === 'totp'
+                ? 'Incorrect or expired code. Try again.'
+                : 'Recovery code invalid or already used.',
+              'error'
+            );
 
-      const p=document.createElement('p');
-      p.textContent=
-        'Ye 10 single-use recovery codes hain. Secure offline jagah save karein.';
-      box.appendChild(p);
+            shake(box);
+            focusInputNow(input);
+            return;
+          }
 
-      const ta=document.createElement('textarea');
-      ta.readOnly=true;
-      ta.value=verified.recoveryCodes.join('\n');
-      ta.style.cssText=
-        'box-sizing:border-box;width:100%;height:230px;'+
-        'font-family:monospace;padding:10px;';
-      box.appendChild(ta);
+          if (code === 'HTTP_429' || code === 'LOGIN_LOCKED') {
+            setNote(
+              note,
+              'Too many attempts. Please wait and try again.',
+              'error'
+            );
+            shake(box);
+            focusInputNow(input);
+            return;
+          }
 
-      const copy=btn('Copy Codes');
-      const done=btn('I Saved Them');
-
-      box.appendChild(copy);
-      box.appendChild(done);
-
-      copy.onclick=async()=>{
-        try {
-          await navigator.clipboard.writeText(
-            ta.value
+          setNote(
+            note,
+            'Verification failed. Please try again.',
+            'error'
           );
-          copy.textContent='Copied';
-        } catch {
-          ta.select();
+          shake(box);
+          focusInputNow(input);
         }
+      }
+
+      if (login.mfaEnrolled) {
+        modeToggle.onclick=()=>{
+          setMode(mode === 'totp' ? 'recovery' : 'totp');
+        };
+      }
+
+      input.addEventListener('input', () => {
+        clearInputError(input);
+
+        if (mode === 'totp') {
+          input.value=onlyDigits(input.value).slice(0,6);
+
+          clearTimeout(autoTimer);
+          if (input.value.length === 6) {
+            autoTimer=setTimeout(submit,240);
+          }
+        }
+      });
+
+      enterSubmits(input, submit);
+
+      verify.onclick=submit;
+
+      cancel.onclick=() => {
+        bg.remove();
+        reject(new Error('MFA_CANCELLED'));
       };
 
-      await new Promise(resolve=>{
-        done.onclick=()=>{
-          bg.remove();
-          resolve();
-        };
-      });
-    }
-
-    return verified;
+      focusInputNow(input);
+    });
   }
 
   async function doPasswordLogin(
@@ -664,9 +979,7 @@
   }
 
   async function showForgot() {
-    const {bg,box}=makeOverlay(
-      'Forgot / Reset Password'
-    );
+    const {bg,box}=makeOverlay('Forgot / Reset Password');
 
     const user=field(
       'text',
@@ -674,24 +987,21 @@
       localStorage.getItem(USER_KEY) || 'admin'
     );
 
-    const recovery=field(
-      'text',
-      'Recovery code'
-    );
-
-    const pass=field(
-      'password',
-      'New password (6+ characters)'
-    );
+    const recovery=field('text','Recovery code');
+    const pass=field('password','New password (6+ characters)');
 
     const ts=document.createElement('div');
-
     let token='';
+
+    const note=document.createElement('div');
+    note.className='cy-inline-note muted';
+    note.textContent='Complete the security check, then enter recovery code and a new password.';
 
     box.appendChild(user);
     box.appendChild(recovery);
     box.appendChild(pass);
     box.appendChild(ts);
+    box.appendChild(note);
 
     await addTurnstile(ts,t=>token=t);
 
@@ -701,15 +1011,29 @@
     box.appendChild(reset);
     box.appendChild(cancel);
 
-    cancel.onclick=()=>bg.remove();
+    async function submit() {
+      clearInputError(user,recovery,pass);
 
-    reset.onclick=async()=>{
+      if (!user.value.trim()) {
+        markInputError(user); shake(box); focusInputNow(user); return;
+      }
+      if (!recovery.value.trim()) {
+        markInputError(recovery); shake(box); focusInputNow(recovery); return;
+      }
+      if (!pass.value) {
+        markInputError(pass); shake(box); focusInputNow(pass); return;
+      }
+      if (!token) {
+        setNote(note,'Complete Turnstile first.','error');
+        shake(box);
+        return;
+      }
+
+      reset.disabled=true;
+      cancel.disabled=true;
+      setNote(note,'Resetting password…','muted');
+
       try {
-        if (!token)
-          throw new Error(
-            'Complete Turnstile first'
-          );
-
         await post(
           '/auth/password/reset',
           {
@@ -720,24 +1044,51 @@
           token
         );
 
-        alert(
-          'Password reset successful. All old sessions revoked.'
-        );
+        setNote(note,'Password reset successful. Redirecting…','success');
 
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(MODE_KEY);
 
-        location.reload();
+        setTimeout(()=>location.reload(),500);
+
       } catch(e) {
-        alert('Reset failed: '+e.message);
+        reset.disabled=false;
+        cancel.disabled=false;
+
+        const code=String(e.code || '');
+
+        if (code === 'RECOVERY_DENIED' || code === 'HTTP_401') {
+          markInputError(recovery);
+          recovery.value='';
+          setNote(note,'Recovery code invalid or already used.','error');
+          shake(box);
+          focusInputNow(recovery);
+        } else if (code === 'NEW_PASSWORD_REJECTED' || code === 'HTTP_400') {
+          markInputError(pass);
+          setNote(note,'New password rejected. Use a stronger password.','error');
+          shake(box);
+          focusInputNow(pass);
+        } else if (code === 'TURNSTILE_DENIED' || code === 'HTTP_403') {
+          setNote(note,'Security check failed. Please complete it again.','error');
+          shake(box);
+        } else {
+          setNote(note,'Reset failed. Please try again.','error');
+          shake(box);
+        }
       }
-    };
+    }
+
+    enterSubmits(recovery, submit);
+    enterSubmits(pass, submit);
+
+    cancel.onclick=()=>bg.remove();
+    reset.onclick=submit;
+
+    focusInputNow(recovery);
   }
 
   async function showChange() {
-    const {bg,box}=makeOverlay(
-      'Change Password'
-    );
+    const {bg,box}=makeOverlay('Change Password');
 
     const user=field(
       'text',
@@ -745,29 +1096,25 @@
       localStorage.getItem(USER_KEY) || 'admin'
     );
 
-    const current=field(
-      'password',
-      'Current password'
-    );
-
-    const next=field(
-      'password',
-      'New password (6+ characters)'
-    );
-
-    const code=field(
-      'text',
-      'Current 6-digit authenticator code'
-    );
+    const current=field('password','Current password');
+    const next=field('password','New password (6+ characters)');
+    const code=field('text','Current 6-digit authenticator code');
+    code.inputMode='numeric';
+    code.autocomplete='one-time-code';
 
     const ts=document.createElement('div');
     let token='';
+
+    const note=document.createElement('div');
+    note.className='cy-inline-note muted';
+    note.textContent='Enter current password, new password, and a fresh authenticator code.';
 
     box.appendChild(user);
     box.appendChild(current);
     box.appendChild(next);
     box.appendChild(code);
     box.appendChild(ts);
+    box.appendChild(note);
 
     await addTurnstile(ts,t=>token=t);
 
@@ -777,15 +1124,35 @@
     box.appendChild(change);
     box.appendChild(cancel);
 
-    cancel.onclick=()=>bg.remove();
+    async function submit() {
+      clearInputError(user,current,next,code);
 
-    change.onclick=async()=>{
+      code.value = onlyDigits(code.value).slice(0,6);
+
+      if (!current.value) {
+        markInputError(current); shake(box); focusInputNow(current); return;
+      }
+      if (!next.value) {
+        markInputError(next); shake(box); focusInputNow(next); return;
+      }
+      if (!/^\d{6}$/.test(code.value)) {
+        markInputError(code);
+        setNote(note,'Enter a valid 6-digit MFA code.','error');
+        shake(box);
+        focusInputNow(code);
+        return;
+      }
+      if (!token) {
+        setNote(note,'Complete Turnstile first.','error');
+        shake(box);
+        return;
+      }
+
+      change.disabled=true;
+      cancel.disabled=true;
+      setNote(note,'Changing password…','muted');
+
       try {
-        if (!token)
-          throw new Error(
-            'Complete Turnstile first'
-          );
-
         await post(
           '/auth/password/change',
           {
@@ -797,21 +1164,51 @@
           token
         );
 
-        alert(
-          'Password changed. Please login again.'
-        );
+        setNote(note,'Password changed. Redirecting to login…','success');
 
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(MODE_KEY);
 
-        location.reload();
+        setTimeout(()=>location.reload(),500);
+
       } catch(e) {
-        alert(
-          'Change failed: '+e.message+
-          '\nIf MFA code was just used for login, wait for the next 30-second code.'
-        );
+        change.disabled=false;
+        cancel.disabled=false;
+
+        const err=String(e.code || '');
+
+        if (err === 'CURRENT_PASSWORD_DENIED' || err === 'HTTP_401') {
+          markInputError(current);
+          current.value='';
+          setNote(note,'Current password incorrect, or MFA code invalid/expired.','error');
+          shake(box);
+          focusInputNow(current);
+        } else if (err === 'NEW_PASSWORD_REJECTED' || err === 'HTTP_400') {
+          markInputError(next);
+          setNote(note,'New password rejected. Use a stronger password.','error');
+          shake(box);
+          focusInputNow(next);
+        } else if (err === 'MFA_DENIED_OR_REPLAY' || err === 'MFA_CODE_REPLAY') {
+          markInputError(code);
+          code.value='';
+          setNote(note,'Incorrect or already-used MFA code. Try the next fresh code.','error');
+          shake(box);
+          focusInputNow(code);
+        } else {
+          setNote(note,'Change failed. Please try again.','error');
+          shake(box);
+        }
       }
-    };
+    }
+
+    enterSubmits(current, () => focusInputNow(next));
+    enterSubmits(next, () => focusInputNow(code));
+    enterSubmits(code, submit);
+
+    cancel.onclick=()=>bg.remove();
+    change.onclick=submit;
+
+    focusInputNow(current);
   }
 
   async function installLoginUI() {
@@ -845,31 +1242,31 @@
       localStorage.getItem(USER_KEY) || 'admin'
     );
 
-    const pass=field(
-      'password',
-      'Password'
-    );
+    const pass=field('password','Password');
 
     const ts=document.createElement('div');
     ts.style.margin='10px 0';
 
-    const login=btn('Sign in with Password');
+    const note=document.createElement('div');
+    note.className='cy-inline-note muted';
+    note.textContent='Complete the security check to enable sign-in.';
 
-    const forgot=btn(
-      'Forgot / Reset Password',
-      true
-    );
+    const login=btn('Sign in with Password');
+    login.disabled=true;
+    login.style.opacity='.68';
+    login.style.cursor='not-allowed';
+
+    const forgot=btn('Forgot / Reset Password',true);
 
     panel.appendChild(title);
     panel.appendChild(user);
     panel.appendChild(pass);
     panel.appendChild(ts);
+    panel.appendChild(note);
     panel.appendChild(login);
     panel.appendChild(forgot);
 
     authLayer.prepend(panel);
-
-    login.disabled=true;
 
     try {
       loginTurnstileId=await addTurnstile(
@@ -877,50 +1274,128 @@
         t=>{
           loginTurnstileToken=t || '';
           login.disabled=!loginTurnstileToken;
+          login.style.opacity = login.disabled ? '.68' : '1';
+          login.style.cursor = login.disabled ? 'not-allowed' : 'pointer';
+
+          setNote(
+            note,
+            loginTurnstileToken
+              ? 'Security check complete. Press Enter or Sign in.'
+              : 'Complete the security check to enable sign-in.',
+            loginTurnstileToken ? 'success' : 'muted'
+          );
         }
       );
     } catch(e) {
-      login.disabled=true;
       console.error('Turnstile load failed:',e);
+      setNote(note,'Security check failed to load. Refresh the page.','error');
     }
 
-    login.onclick=async()=>{
+    async function submitPasswordLogin() {
+      if (login.disabled) return;
+
+      clearInputError(user,pass);
+
+      if (!user.value.trim()) {
+        markInputError(user);
+        setNote(note,'Enter username.','error');
+        shake(panel);
+        focusInputNow(user);
+        return;
+      }
+
+      if (!pass.value) {
+        markInputError(pass);
+        setNote(note,'Enter password.','error');
+        shake(panel);
+        focusInputNow(pass);
+        return;
+      }
+
       login.disabled=true;
+      forgot.disabled=true;
+      user.disabled=true;
+      pass.disabled=true;
+
+      login.style.opacity='.68';
+      login.style.cursor='not-allowed';
+
+      setNote(note,'Signing in…','muted');
 
       try {
-        if (!loginTurnstileToken)
-          throw new Error(
-            'Complete Turnstile first'
-          );
-
         await doPasswordLogin(
           user.value.trim(),
           pass.value,
           loginTurnstileToken
         );
-      } catch(e) {
-        alert('Login failed: '+e.message);
 
+      } catch(e) {
         login.disabled=false;
+        forgot.disabled=false;
+        user.disabled=false;
+        pass.disabled=false;
+        login.style.opacity='1';
+        login.style.cursor='pointer';
+
+        const code=String(e.code || e.message || '');
+
+        if (
+          code === 'LOGIN_DENIED' ||
+          code === 'HTTP_401'
+        ) {
+          markInputError(pass);
+          pass.value='';
+          setNote(note,'Incorrect username or password.','error');
+          shake(panel);
+          focusInputNow(pass);
+
+        } else if (
+          code === 'LOGIN_LOCKED' ||
+          code === 'HTTP_429'
+        ) {
+          setNote(note,'Too many attempts. Please wait and try again.','error');
+          shake(panel);
+          focusInputNow(pass);
+
+        } else if (
+          code === 'TURNSTILE_DENIED' ||
+          code === 'HTTP_403'
+        ) {
+          setNote(note,'Security check failed. Please complete it again.','error');
+          shake(panel);
+
+        } else if (code === 'MFA_CANCELLED') {
+          setNote(note,'MFA was cancelled. Sign in again when ready.','error');
+          shake(panel);
+
+        } else {
+          setNote(note,'Login failed. Please try again.','error');
+          shake(panel);
+        }
 
         try {
-          if (loginTurnstileId!==null)
-            window.turnstile.reset(
-              loginTurnstileId
-            );
+          if (loginTurnstileId !== null && window.turnstile) {
+            window.turnstile.reset(loginTurnstileId);
+          }
         } catch {}
 
         loginTurnstileToken='';
+        login.disabled=true;
+        login.style.opacity='.68';
+        login.style.cursor='not-allowed';
       }
-    };
+    }
+
+    enterSubmits(user, submitPasswordLogin);
+    enterSubmits(pass, submitPasswordLogin);
 
     forgot.onclick=showForgot;
+    login.onclick=submitPasswordLogin;
 
-    const passkey=
-      document.getElementById('loginBtn');
-
-    if (passkey) {
-      passkey.textContent='Use Passkey Instead';
+    if (!user.value.trim()) {
+      focusInputNow(user);
+    } else {
+      focusInputNow(pass);
     }
   }
 
@@ -948,6 +1423,8 @@
   }
 
   function boot() {
+    injectStyles();
+    installGlobalSearchHotkeys();
     installLoginUI().catch(console.error);
     addChangePasswordButton();
 
