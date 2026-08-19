@@ -1,4 +1,4 @@
-/* CYBERSABIL_ULTRA_PREMIUM_AUTH_SHELL_V1 */
+/* CYBERSABIL_PREFERRED_SPLIT_AUTH_ULTRA_V2 */
 (() => {
   'use strict';
 
@@ -19,14 +19,30 @@
     const hero=el('section','premiumAuthHero');
     const brand=el('div','premiumBrand');
     brand.append(el('div','premiumBrandMark','CS'),el('div','','CyberSabil'));
-    hero.append(brand);
+
+    const main=el('div','premiumHeroMain');
+    main.append(el('div','premiumEyebrow','Protected workspace'));
+    main.append(
+      el('h1','','Your files. Private by design.'),
+      el('p','','Secure access with password, authenticator verification and device-bound session protection.')
+    );
+
+    const chips=el('div','premiumTrustRow');
+    ['Password + MFA','Device protected','Private access'].forEach(x=>{
+      chips.append(el('span','premiumTrustChip',x));
+    });
+    main.append(chips);
+
+    const foot=el('div','premiumHeroFoot');
+    foot.append(el('span','premiumLiveDot'),el('span','','Secure gateway online'));
+    hero.append(brand,main,foot);
 
     const pane=el('section','premiumAuthPane');
     const inner=el('div','premiumAuthInner');
     const top=el('div','premiumAuthTop');
     top.append(
-      el('h2','','Welcome back'),
-      el('p','','Sign in securely to access your private files.')
+      el('h2','','Sign in'),
+      el('p','','Enter your credentials to continue to My Files.')
     );
 
     const primary=el('div');
@@ -41,13 +57,22 @@
     passkeyMount.id='premiumPasskeyMount';
     options.append(summary,passkeyMount);
 
-    const foot=el('div','premiumAuthFoot','Protected by CyberSabil secure access controls');
+    const authFoot=el('div','premiumAuthFoot','Protected by CyberSabil secure access controls');
 
-    inner.append(top,primary,divider,options,foot);
+    inner.append(top,primary,divider,options,authFoot);
     pane.append(inner);
     shell.append(hero,pane);
     auth.append(shell);
     return shell;
+  }
+
+  function decorate(panel){
+    if(!panel)return;
+    panel.querySelectorAll('input').forEach(input=>{
+      input.spellcheck=false;
+      if(input.type==='text'&&/username/i.test(input.placeholder||''))input.autocomplete='username';
+      if(input.type==='password')input.autocomplete='current-password';
+    });
   }
 
   function arrange(){
@@ -59,17 +84,13 @@
     const primary=document.getElementById('premiumPrimaryMount');
     if(panel&&primary&&panel.parentElement!==primary){
       primary.append(panel);
-      panel.querySelectorAll('input').forEach(input=>{
-        input.spellcheck=false;
-        if(input.type==='text'&&/username/i.test(input.placeholder||''))input.autocomplete='username';
-        if(input.type==='password')input.autocomplete='current-password';
-      });
+      decorate(panel);
     }
 
     const passkey=document.getElementById('loginBtn');
     const mount=document.getElementById('premiumPasskeyMount');
     if(passkey&&mount&&passkey.parentElement!==mount){
-      passkey.textContent='Continue with Passkey';
+      if(!passkey.classList.contains('passkey-busy'))passkey.textContent='Continue with Passkey';
       mount.append(passkey);
     }
 
@@ -83,17 +104,33 @@
     return Boolean(panel&&passkey);
   }
 
-  function boot(){
+  function ready(){
     arrange();
+    requestAnimationFrame(()=>{
+      document.documentElement.classList.remove('cy-preboot');
+      document.documentElement.classList.add('cy-ui-ready');
+    });
+  }
+
+  function boot(){
+    ready();
+
     let scheduled=false;
     const ob=new MutationObserver(()=>{
       if(scheduled)return;
       scheduled=true;
-      requestAnimationFrame(()=>{scheduled=false;arrange();});
+      requestAnimationFrame(()=>{
+        scheduled=false;
+        arrange();
+      });
     });
+
     ob.observe(document.documentElement,{subtree:true,childList:true});
     setTimeout(arrange,250);
     setTimeout(arrange,800);
+
+    /* hard fail-safe: never leave page masked */
+    setTimeout(()=>document.documentElement.classList.remove('cy-preboot'),2200);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);
